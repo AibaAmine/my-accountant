@@ -1,0 +1,65 @@
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+
+
+class User(AbstractUser):
+
+    email = models.EmailField(unique=True)
+    phone = models.CharField(max_length=20, blank=True)
+    user_type = models.CharField(
+        max_length=50,
+        choices=[
+            ("client", "Client"),
+            ("accountant", "Accountant"),
+            ("admin", "Admin"),
+            ("instructor", "Instructor"),
+        ],
+        default="client",
+    )
+    company_name = models.CharField(max_length=255, blank=True)
+    job_title = models.CharField(max_length=100, blank=True)
+    bio = models.TextField(blank=True)
+    profile_picture_url = models.URLField(blank=True, null=True)
+    is_email_verified = models.BooleanField(default=False)
+    account_status = models.CharField(
+        max_length=20,
+        choices=[
+            ("active", "Active"),
+            ("inactive", "Inactive"),
+            ("suspended", "Suspended"),
+        ],
+        default="active",
+    )
+    last_login_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["username"]
+
+    class Meta:
+        db_table = "users"
+        verbose_name = "User"
+        verbose_name_plural = "Users"
+
+    def __str__(self):
+        return f"{self.username} ({self.email})"
+
+
+
+class AdminUser(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+    admin_id = models.CharField(max_length=100, unique=True)
+    username = models.CharField(max_length=150, unique=True)
+    permissions = models.JSONField(default=list)
+    is_private_boolean = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "admin_user"
+        verbose_name = "Admin User"
+        verbose_name_plural = "Admin Users"
+
+    def __str__(self):
+        return f"Admin: {self.username}"
