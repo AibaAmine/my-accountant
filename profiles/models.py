@@ -29,4 +29,4 @@ class AccountantProfile(models.Model):
         verbose_name_plural = "Accountant Profiles"
 
     def __str__(self):
-        return f"Accountant: {self.user_id.username}"
+        return f"Accountant: {self.user_id.full_name}"

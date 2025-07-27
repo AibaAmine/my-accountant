@@ -1,18 +1,22 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+import uuid
 
 
 class User(AbstractUser):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    username = None  
 
     email = models.EmailField(unique=True)
+    full_name = models.CharField(max_length=255, blank=True, default="")
     phone = models.CharField(max_length=20, blank=True)
     user_type = models.CharField(
         max_length=50,
         choices=[
             ("client", "Client"),
             ("accountant", "Accountant"),
+            ("student", "Student"),
             ("admin", "Admin"),
-            ("instructor", "Instructor"),
         ],
         default="client",
     )
@@ -35,7 +39,7 @@ class User(AbstractUser):
     updated_at = models.DateTimeField(auto_now=True)
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["username"]
+    REQUIRED_FIELDS = []
 
     class Meta:
         db_table = "users"
@@ -43,8 +47,7 @@ class User(AbstractUser):
         verbose_name_plural = "Users"
 
     def __str__(self):
-        return f"{self.username} ({self.email})"
-
+        return f"{self.full_name} ({self.email})"
 
 
 class AdminUser(models.Model):
