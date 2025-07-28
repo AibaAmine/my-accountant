@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path, include, re_path
+from django.urls import path, include
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -7,22 +7,18 @@ from rest_framework_simplejwt.views import (
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-from allauth.account import views as allauth_views
-from django.shortcuts import redirect
+from dj_rest_auth.views import PasswordResetView, PasswordResetConfirmView
 from dj_rest_auth.registration.views import SocialLoginView
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
+
 
 class GoogleLogin(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
 
 
-# Custom bridge function to handle parameter name mismatch
-def password_reset_confirm_bridge(request, uidb64, token):
-    """
-    Bridge function that converts dj-rest-auth parameters (uidb64, token)
-    to allauth parameters (uidb36, key)
-    """
-    return allauth_views.password_reset_from_key(request, uidb36=uidb64, key=token)
+class FacebookLogin(SocialLoginView):
+    adapter_class = FacebookOAuth2Adapter
 
 
 schema_view = get_schema_view(
@@ -44,18 +40,20 @@ urlpatterns = [
     path(
         "auth/registration/", include("dj_rest_auth.registration.urls")
     ),  # Registration
-    # Social Authentication APIs (JSON responses)
-    path("auth/google/", GoogleLogin.as_view(), name="google_login"),
-    path("", include("allauth.urls")),
-    # Bridge URL that converts dj-rest-auth parameters to allauth parameters
-    re_path(
-        r"^password-reset-confirm/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,32})/$",
-        password_reset_confirm_bridge,
+    path("auth/password/reset/", PasswordResetView.as_view(), name="password_reset"),
+    path(
+        "auth/password/reset/confirm/<uidb64>/<token>/",
+        PasswordResetConfirmView.as_view(),
         name="password_reset_confirm",
     ),
+    path("auth/google/", GoogleLogin.as_view(), name="google_login"),  # Social login
+    path(
+        "auth/facebook/", FacebookLogin.as_view(), name="facebook_login"
+    ),  # Facebook login
+    # JWT token endpoints
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-    # api documentation urls:
+    # API documentation URLs
     path(
         "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"
     ),

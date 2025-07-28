@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.facebook",
     "dj_rest_auth",
     "dj_rest_auth.registration",
     "channels",
@@ -75,7 +76,6 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
 ]
 
@@ -145,8 +145,6 @@ USE_I18N = True
 USE_TZ = True
 
 
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
 STATIC_URL = "static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
@@ -214,38 +212,23 @@ SITE_ID = 1
 # for dev
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-# Critical allauth settings for email-only authentication
 ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_EMAIL_VERIFICATION = "optional"
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_USER_MODEL_EMAIL_FIELD = "email"
 ACCOUNT_UNIQUE_EMAIL = True
 
-ACCOUNT_PRESERVE_USERNAME_CASING = False
-ACCOUNT_SESSION_REMEMBER = None
-
-# Custom adapter to handle your user_type field
-ACCOUNT_SIGNUP_FORM_CLASS = None  # create a custom form later
-
-# Login/Logout URLs
-LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/"
-
-
-# dj-rest-auth settings
+# Update signup fields to avoid warning
+ACCOUNT_SIGNUP_FIELDS = {
+    "email": {"required": True},
+}
 REST_USE_JWT = True
 JWT_AUTH_COOKIE = "my-app-auth"
 JWT_AUTH_REFRESH_COOKIE = "my-refresh-token"
-JWT_AUTH_HTTPONLY = False  # Allow frontend to access the token
+JWT_AUTH_HTTPONLY = False  
 
-# Disable CSRF for REST API
 REST_SESSION_LOGIN = False
 
-# CSRF settings for OAuth
-CSRF_TRUSTED_ORIGINS = ["http://localhost:8000", "http://127.0.0.1:8000"]
-
-# Disable DRF token authentication completely
 REST_AUTH_TOKEN_MODEL = None
 REST_AUTH_TOKEN_CREATOR = None
 
@@ -256,28 +239,24 @@ REST_AUTH = {
     "REGISTER_SERIALIZER": "accounts.serializers.CustomRegisterSerializer",
     "USER_DETAILS_SERIALIZER": "accounts.serializers.CustomUserDetailsSerializer",
     "LOGIN_SERIALIZER": "accounts.serializers.CustomLoginSerializer",
-    # for frontend pass reset page
-    # "PASSWORD_RESET_CONFIRM_URL": "myaccountant://reset-password?uid={uid}&token={token}",
+    # Mobile app deep link for password reset
+    "PASSWORD_RESET_CONFIRM_URL": "myaccountant://reset-password?uid={uid}&token={token}",
 }
 
-# Override all authentication backends to use email
 AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-
-# Force allauth to not use username field at all
 OLD_PASSWORD_FIELD_ENABLED = True
 LOGOUT_ON_PASSWORD_CHANGE = False
 
-# Social providers (google)
+# Social providers (google & facebook)
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "APP": {
             "client_id": os.getenv("OAUTH_GOOGLE_CLIENT_ID"),
             "secret": os.getenv("OAUTH_GOOGLE_SECRET"),
-            
         },
         "SCOPE": [
             "profile",
@@ -287,20 +266,37 @@ SOCIALACCOUNT_PROVIDERS = {
             "access_type": "online",
         },
         "OAUTH_PKCE_ENABLED": True,
-    }
+    },
+    "facebook": {
+        "APP": {
+            "client_id": os.getenv("OAUTH_FACEBOOK_CLIENT_ID"),
+            "secret": os.getenv("OAUTH_FACEBOOK_SECRET"),
+        },
+        "SCOPE": [
+            "email",
+            "public_profile",
+        ],
+        "AUTH_PARAMS": {},
+        "FIELDS": [
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "picture",
+        ],
+        "EXCHANGE_TOKEN": True,
+        "LOCALE_FUNC": "path.to.callable",
+        "VERIFIED_EMAIL": False,
+        "VERSION": "v18.0",
+    },
 }
 
-# Custom settings for User model
-ACCOUNT_ADAPTER = "allauth.account.adapter.DefaultAccountAdapter"
-SOCIALACCOUNT_ADAPTER = "allauth.socialaccount.adapter.DefaultSocialAccountAdapter"
-
-# Additional social account settings
-SOCIALACCOUNT_LOGIN_ON_GET = True  # Allow direct login via GET request
 SOCIALACCOUNT_AUTO_SIGNUP = True  # Automatically create accounts for social logins
 SOCIALACCOUNT_EMAIL_VERIFICATION = "none"  # Skip email verification for social accounts
 
 
 # api doc settings
+
 SWAGGER_SETTINGS = {
     "DEFAULT_INFO": "my_accountant_project.urls.schema_view",
     "USE_SESSION_AUTH": False,
