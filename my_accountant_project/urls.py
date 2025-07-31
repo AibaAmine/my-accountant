@@ -11,6 +11,13 @@ from dj_rest_auth.views import PasswordResetView, PasswordResetConfirmView
 from dj_rest_auth.registration.views import SocialLoginView
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
+from django.http import JsonResponse
+
+
+def account_inactive_view(request):
+    return JsonResponse(
+        {"detail": "Account inactive. Please verify your email."}, status=403
+    )
 
 
 class GoogleLogin(SocialLoginView):
@@ -37,6 +44,7 @@ schema_view = get_schema_view(
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("auth/", include("dj_rest_auth.urls")),  # Login, logout, user details, etc.
+    path("auth/", include("accounts.urls")),
     path(
         "auth/registration/", include("dj_rest_auth.registration.urls")
     ),  # Registration
@@ -65,4 +73,12 @@ urlpatterns = [
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("", schema_view.with_ui("swagger", cache_timeout=0), name="api-docs"),
     path("profiles/", include("profiles.urls")),
+    
+    
+    
+    
+    path("accounts/inactive/", account_inactive_view, name="account_inactive"),
+
+
+
 ]

@@ -60,7 +60,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_filters",
     "drf_yasg",
-    "accounts",
+    "accounts.apps.AccountsConfig",
     "profiles",
     "services",
     "bookings",
@@ -212,26 +212,24 @@ SITE_ID = 1
 # for dev
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_EMAIL_VERIFICATION = "optional"
+
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_USER_MODEL_EMAIL_FIELD = "email"
+ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_EMAIL_CONFIRMATION_HMAC = False  
+ACCOUNT_CONFIRM_EMAIL_ON_GET = False  
 
-# Update signup fields to avoid warning
-ACCOUNT_SIGNUP_FIELDS = {
-    "email": {"required": True},
-}
+ACCOUNT_SIGNUP_FIELDS = ["email*"]
+ACCOUNT_LOGIN_METHODS = ["email"]
+
 REST_USE_JWT = True
 JWT_AUTH_COOKIE = "my-app-auth"
 JWT_AUTH_REFRESH_COOKIE = "my-refresh-token"
-JWT_AUTH_HTTPONLY = False  
-
+JWT_AUTH_HTTPONLY = False
 REST_SESSION_LOGIN = False
-
 REST_AUTH_TOKEN_MODEL = None
 REST_AUTH_TOKEN_CREATOR = None
-
 
 REST_AUTH = {
     "USE_JWT": True,
@@ -239,14 +237,18 @@ REST_AUTH = {
     "REGISTER_SERIALIZER": "accounts.serializers.CustomRegisterSerializer",
     "USER_DETAILS_SERIALIZER": "accounts.serializers.CustomUserDetailsSerializer",
     "LOGIN_SERIALIZER": "accounts.serializers.CustomLoginSerializer",
-    # Mobile app deep link for password reset
+     #!update this later for otp email 
     "PASSWORD_RESET_CONFIRM_URL": "myaccountant://reset-password?uid={uid}&token={token}",
+   
+    "REGISTER_EMAIL_VERIFICATION": False,
+    "SEND_CONFIRMATION_EMAIL": False,
 }
 
 AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
+
 
 OLD_PASSWORD_FIELD_ENABLED = True
 LOGOUT_ON_PASSWORD_CHANGE = False

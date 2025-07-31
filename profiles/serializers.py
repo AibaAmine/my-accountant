@@ -33,4 +33,3 @@ class AccountantProfileSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-

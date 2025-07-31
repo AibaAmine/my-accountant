@@ -2,6 +2,11 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from dj_rest_auth.serializers import UserDetailsSerializer, LoginSerializer
+import random
+from .models import EmailVerificationOTP
+
+from django.utils import timezone
+from datetime import timedelta
 
 User = get_user_model()
 
@@ -57,6 +62,7 @@ class CustomRegisterSerializer(RegisterSerializer):
         user.full_name = self.validated_data.get("full_name", "")
         user.user_type = self.validated_data.get("user_type")
         user.phone = self.validated_data.get("phone")
+        user.is_active = False  # Require OTP verification before activation
         user.save()
         return user
 
@@ -92,3 +98,73 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
             "updated_at",
         )
         read_only_fields = ("email", "pk", "created_at", "updated_at")
+
+
+# for Generates & sends OTP
+class SendEmailOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        try:
+            user = User.objects.get(email=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found.")
+
+        if user.is_active:
+            raise serializers.ValidationError("This email is allready validated ")
+        return value
+
+    def save(self):
+        email = self.validated_data["email"]
+        user = User.objects.get(email=email)
+        print("[DEBUG] About to create EmailVerificationOTP in serializer")
+        code = str(random.randint(100000, 999999))
+        EmailVerificationOTP.objects.create(
+            user=user, code=code, expires_at=timezone.now() + timedelta(minutes=10)
+        )
+        print(f" OTP for {email} : {code}")
+        return user
+
+
+# for Checks OTP & activates account
+class VerifyEmailOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp_code = serializers.CharField(max_length=6)
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        otp_code = attrs.get("otp_code")
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"email": "User not found."})
+
+        try:
+            otp = EmailVerificationOTP.objects.get(
+                user=user, code=otp_code, is_used=False
+            )
+        except EmailVerificationOTP.DoesNotExist:
+            raise serializers.ValidationError({"otp_code": "Invalide OTP."})
+
+        if otp.is_expired():
+            raise serializers.ValidationError({"otp_code": "OTP expired."})
+
+        attrs["user"] = user
+        attrs["otp"] = otp
+
+        return attrs
+
+    def save(self):
+        user = self.validated_data["user"]
+        otp = self.validated_data["otp"]
+
+        user.is_active = True
+        user.account_status = "active"
+        user.is_email_verified = True
+        user.save()
+
+        otp.is_used = True
+        otp.save()
+
+        return user
