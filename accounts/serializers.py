@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from dj_rest_auth.serializers import UserDetailsSerializer, LoginSerializer
 import random
-from .models import EmailVerificationOTP
+from .models import EmailVerificationOTP, PasswordResetOTP
 
 from django.utils import timezone
 from datetime import timedelta
@@ -168,3 +168,68 @@ class VerifyEmailOTPSerializer(serializers.Serializer):
         otp.save()
 
         return user
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        try:
+            user = User.objects.get(email=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("No user found with that email.")
+        return value
+
+    def save(self):
+        email = self.validated_data["email"]
+        user = User.objects.get(email=email)
+        code = str(random.randint(100000, 999999))
+        expires_at = timezone.now() + timedelta(minutes=10)
+        PasswordResetOTP.objects.create(user=user, code=code, expires_at=expires_at)
+
+        # existing method to send email
+        user.email_user(
+            subject="Your Password Reset Code",
+            message=f"Your OTP code for password reset is {code}. It expires in 10 minutes.",
+        )
+
+        return user
+
+
+class VerifyPasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp_code = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        code = attrs.get("otp_code")
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid email.")
+
+        try:
+            otp = PasswordResetOTP.objects.get(user=user, code=code, is_used=False)
+        except PasswordResetOTP.DoesNotExist:
+            raise serializers.ValidationError({"otp_code": "Invalide OTP."})
+
+        if otp.is_expired():
+            raise serializers.ValidationError({"otp_code": "OTP expired."})
+
+        attrs["user"] = user
+        attrs["otp"] = otp
+        return attrs
+
+    def save(self):
+        user = self.validated_data["user"]
+        otp = self.validated_data["otp"]
+        new_password = self.validated_data["new_password"]
+
+        # method to set the new password as hash
+        user.set_password(new_password)
+        user.save()
+
+        otp.is_used = True
+        otp.save()

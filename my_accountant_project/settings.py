@@ -237,9 +237,6 @@ REST_AUTH = {
     "REGISTER_SERIALIZER": "accounts.serializers.CustomRegisterSerializer",
     "USER_DETAILS_SERIALIZER": "accounts.serializers.CustomUserDetailsSerializer",
     "LOGIN_SERIALIZER": "accounts.serializers.CustomLoginSerializer",
-     #!update this later for otp email 
-    "PASSWORD_RESET_CONFIRM_URL": "myaccountant://reset-password?uid={uid}&token={token}",
-   
     "REGISTER_EMAIL_VERIFICATION": False,
     "SEND_CONFIRMATION_EMAIL": False,
 }

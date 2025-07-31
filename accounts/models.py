@@ -54,7 +54,7 @@ class User(AbstractUser):
 
 
 class EmailVerificationOTP(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="emails")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="otps")
     code = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     is_used = models.BooleanField(default=False)
@@ -65,6 +65,20 @@ class EmailVerificationOTP(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.code}"
+
+
+class PasswordResetOTP(models.Model):
+    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name="codes")
+    code = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+    expires_at= models.DateTimeField()
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + timedelta(minutes=10)
+
+    def __str__(self):
+        return f"Password reset OTP for {self.user.email} - {self.code}"
 
 
 class AdminUser(models.Model):
