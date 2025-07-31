@@ -7,12 +7,15 @@ from rest_framework_simplejwt.views import (
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-from dj_rest_auth.views import PasswordResetView, PasswordResetConfirmView
 from dj_rest_auth.registration.views import SocialLoginView
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
 from django.http import JsonResponse
+from dj_rest_auth.registration.views import RegisterView
+from dj_rest_auth.views import LoginView, LogoutView, UserDetailsView
+from drf_yasg.utils import swagger_auto_schema
 
+LogoutView.get = swagger_auto_schema(auto_schema=None)(LogoutView.get)
 
 def account_inactive_view(request):
     return JsonResponse(
@@ -43,18 +46,15 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("auth/", include("dj_rest_auth.urls")),  # Login, logout, user details, etc.
+    # Auth endpoints (login, logout, user details)
+    path("auth/login/", LoginView.as_view(), name="rest_login"),
+    path("auth/logout/", LogoutView.as_view(), name="rest_logout"),
+    path("auth/user/", UserDetailsView.as_view(), name="rest_user_details"),
     path("auth/", include("accounts.urls")),
-    path(
-        "auth/registration/", include("dj_rest_auth.registration.urls")
-    ),  # Registration
-    path("auth/password/reset/", PasswordResetView.as_view(), name="password_reset"),
-    path(
-        "auth/password/reset/confirm/<uidb64>/<token>/",
-        PasswordResetConfirmView.as_view(),
-        name="password_reset_confirm",
-    ),
-    path("auth/google/", GoogleLogin.as_view(), name="google_login"),  # Social login
+    # Registration
+    path("auth/registration/", RegisterView.as_view(), name="rest_register"),
+    # google login
+    path("auth/google/", GoogleLogin.as_view(), name="google_login"),
     path(
         "auth/facebook/", FacebookLogin.as_view(), name="facebook_login"
     ),  # Facebook login
@@ -73,12 +73,5 @@ urlpatterns = [
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("", schema_view.with_ui("swagger", cache_timeout=0), name="api-docs"),
     path("profiles/", include("profiles.urls")),
-    
-    
-    
-    
     path("accounts/inactive/", account_inactive_view, name="account_inactive"),
-
-
-
 ]

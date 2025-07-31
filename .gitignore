@@ -63,3 +63,11 @@ venv.bak/
 # OS files
 .DS_Store
 Thumbs.db
+
+
+*.pyc
+__pycache__/
+.env
+db.sqlite3
+static/
+media/
