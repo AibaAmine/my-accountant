@@ -52,6 +52,12 @@ class User(AbstractUser):
     def __str__(self):
         return f"{self.full_name} ({self.email})"
 
+    def email_user(self, subject, message, from_email=None, **kwargs):
+        """Send an email to this user."""
+        from django.core.mail import send_mail
+
+        send_mail(subject, message, from_email, [self.email], **kwargs)
+
 
 class EmailVerificationOTP(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="otps")
@@ -68,11 +74,11 @@ class EmailVerificationOTP(models.Model):
 
 
 class PasswordResetOTP(models.Model):
-    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name="codes")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="codes")
     code = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     is_used = models.BooleanField(default=False)
-    expires_at= models.DateTimeField()
+    expires_at = models.DateTimeField()
 
     def is_expired(self):
         return timezone.now() > self.created_at + timedelta(minutes=10)

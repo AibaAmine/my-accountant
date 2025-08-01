@@ -15,7 +15,7 @@ SECRET_KEY = os.getenv(
 
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS","").split(",")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 if DEBUG:
     ALLOWED_HOSTS += ["127.0.0.1", "localhost"]
 
@@ -95,7 +95,7 @@ if DATABASE_URL:
 else:
     DATABASES = {
         "default": {
-            "ENGINE":os.getenv("DB_ENGINE"),
+            "ENGINE": os.getenv("DB_ENGINE"),
             "NAME": os.getenv("DB_NAME"),
             "USER": os.getenv("DB_USER"),
             "PASSWORD": os.getenv("DB_PASSWORD"),
@@ -211,8 +211,28 @@ AUTH_USER_MODEL = "accounts.User"
 
 SITE_ID = 1
 
-# for dev
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Email Configuration
+if DEBUG:
+    # Local development - emails show in console
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    # Production - use SMTP
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+    # Gmail SMTP Configuration
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
+    EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False").lower() == "true"
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@myaccountant.com")
+SERVER_EMAIL = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+EMAIL_TIMEOUT = 30  # Email timeout in seconds
+EMAIL_BACKEND_FAILSILENTLY = (
+    os.getenv("EMAIL_BACKEND_FAILSILENTLY", "False").lower() == "true"
+)
 
 
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
