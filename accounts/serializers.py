@@ -145,7 +145,7 @@ class VerifyEmailOTPSerializer(serializers.Serializer):
                 user=user, code=otp_code, is_used=False
             )
         except EmailVerificationOTP.DoesNotExist:
-            raise serializers.ValidationError({"otp_code": "Invalide OTP."})
+            raise serializers.ValidationError({"otp_code": "Invalid OTP."})
 
         if otp.is_expired():
             raise serializers.ValidationError({"otp_code": "OTP expired."})
@@ -213,7 +213,7 @@ class VerifyPasswordResetSerializer(serializers.Serializer):
         try:
             otp = PasswordResetOTP.objects.get(user=user, code=code, is_used=False)
         except PasswordResetOTP.DoesNotExist:
-            raise serializers.ValidationError({"otp_code": "Invalide OTP."})
+            raise serializers.ValidationError({"otp_code": "Invalid OTP."})
 
         if otp.is_expired():
             raise serializers.ValidationError({"otp_code": "OTP expired."})

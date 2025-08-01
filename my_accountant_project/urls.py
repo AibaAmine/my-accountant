@@ -12,10 +12,16 @@ from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
 from django.http import JsonResponse
 from dj_rest_auth.registration.views import RegisterView
-from dj_rest_auth.views import LoginView, LogoutView, UserDetailsView
+from dj_rest_auth.views import (
+    LoginView,
+    LogoutView,
+    UserDetailsView,
+    PasswordChangeView,
+)
 from drf_yasg.utils import swagger_auto_schema
 
 LogoutView.get = swagger_auto_schema(auto_schema=None)(LogoutView.get)
+
 
 def account_inactive_view(request):
     return JsonResponse(
@@ -50,6 +56,11 @@ urlpatterns = [
     path("auth/login/", LoginView.as_view(), name="rest_login"),
     path("auth/logout/", LogoutView.as_view(), name="rest_logout"),
     path("auth/user/", UserDetailsView.as_view(), name="rest_user_details"),
+    path(
+        "auth/password/change/",
+        PasswordChangeView.as_view(),
+        name="rest_password_change",
+    ),
     path("auth/", include("accounts.urls")),
     # Registration
     path("auth/registration/", RegisterView.as_view(), name="rest_register"),

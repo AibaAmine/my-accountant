@@ -7,7 +7,6 @@ class AccountantProfileSerializer(serializers.ModelSerializer):
         model = AccountantProfile
         fields = [
             "profile_id",
-            "user_id",
             "bio",
             "profile_picture_url",
             "specializations",
@@ -24,7 +23,6 @@ class AccountantProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "profile_id",
-            "user_id",
             "is_verified",
             "overall_rating",
             "total_completed_sessions",
@@ -32,4 +30,3 @@ class AccountantProfileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-
