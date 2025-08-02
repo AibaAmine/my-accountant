@@ -18,3 +18,5 @@ django-cors-headers
 dj-rest-auth
 dj-rest-auth[with_social]
 requests
+django-cloudinary-storage==0.3.0
+cloudinary

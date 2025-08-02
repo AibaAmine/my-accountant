@@ -4,6 +4,7 @@ from dj_rest_auth.registration.serializers import RegisterSerializer
 from dj_rest_auth.serializers import UserDetailsSerializer, LoginSerializer
 import random
 from .models import EmailVerificationOTP, PasswordResetOTP
+from django.conf import settings
 
 from django.utils import timezone
 from datetime import timedelta
@@ -76,7 +77,6 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
     job_title = serializers.CharField()
     phone = serializers.CharField()
     bio = serializers.CharField()
-    profile_picture_url = serializers.URLField(read_only=True)
     is_email_verified = serializers.BooleanField(read_only=True)
     account_status = serializers.CharField(read_only=True)
 
@@ -97,7 +97,25 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("email", "pk", "created_at", "updated_at")
+        read_only_fields = (
+            "email",
+            "pk",
+            "created_at",
+            "updated_at",
+            "user_type",
+            "is_email_verified",
+            "account_status",
+        )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.profile_picture_url:
+            data["profile_picture_url"] = (
+                f"https://res.cloudinary.com/{settings.CLOUDINARY_STORAGE['CLOUD_NAME']}/image/upload/{instance.profile_picture_url}"
+            )
+        else:
+            data["profile_picture_url"] = None
+        return data
 
 
 # for Generates & sends OTP

@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from accounts.models import User
+from cloudinary.models import CloudinaryField
 
 
 class AccountantProfile(models.Model):
@@ -10,7 +11,7 @@ class AccountantProfile(models.Model):
         User, on_delete=models.CASCADE, related_name="accountant_profile"
     )
     bio = models.TextField(blank=True)
-    profile_picture_url = models.URLField(blank=True, null=True)
+    profile_picture_url = CloudinaryField("image", null=True, blank=True)
     specializations = models.JSONField(default=list)
     certifications = models.JSONField(default=list)
     years_of_experience = models.IntegerField(default=0)
