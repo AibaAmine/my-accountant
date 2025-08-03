@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -186,8 +187,9 @@ SIMPLE_JWT = {
     ),
     "ROTATE_REFRESH_TOKENS": os.getenv("ROTATE_REFRESH_TOKENS", "False").lower()
     == "true",
-    "BLACKLIST_AFTER_ROTATION": os.getenv("BLACKLIST_AFTER_ROTATION", "False").lower()
+    "BLACKLIST_AFTER_ROTATION": os.getenv("BLACKLIST_AFTER_ROTATION", "True").lower()
     == "true",
+    "UPDATE_LAST_LOGIN": False,
 }
 
 # Channels Configuration
@@ -258,9 +260,12 @@ REST_AUTH_TOKEN_CREATOR = None
 REST_AUTH = {
     "USE_JWT": True,
     "JWT_AUTH_HTTPONLY": False,
+    "JWT_AUTH_COOKIE": "my-app-auth",
+    "JWT_AUTH_REFRESH_COOKIE": "my-refresh-token",
     "REGISTER_SERIALIZER": "accounts.serializers.CustomRegisterSerializer",
     "USER_DETAILS_SERIALIZER": "accounts.serializers.CustomUserDetailsSerializer",
     "LOGIN_SERIALIZER": "accounts.serializers.CustomLoginSerializer",
+    "LOGOUT_ON_PASSWORD_CHANGE": False,
 }
 
 AUTHENTICATION_BACKENDS = [

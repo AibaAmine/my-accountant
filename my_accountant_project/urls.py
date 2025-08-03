@@ -24,7 +24,6 @@ from rest_framework.parsers import MultiPartParser, FormParser
 LogoutView.get = swagger_auto_schema(auto_schema=None)(LogoutView.get)
 
 
-
 class CustomUserDetailsView(UserDetailsView):
     parser_classes = [MultiPartParser, FormParser]
 
