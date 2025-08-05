@@ -14,7 +14,7 @@ class Booking(models.Model):
         User, on_delete=models.CASCADE, related_name="accountant_bookings"
     )
     service_id = models.ForeignKey(
-        Service, on_delete=models.CASCADE, related_name="bookings"
+        Service, on_delete=models.CASCADE, related_name="bookings", blank=True, null=True
     )
 
     # Booking details

@@ -90,4 +90,5 @@ urlpatterns = [
     path("", schema_view.with_ui("swagger", cache_timeout=0), name="api-docs"),
     path("profiles/", include("profiles.urls")),
     path("accounts/inactive/", account_inactive_view, name="account_inactive"),
+    path("", include("bookings.urls")),
 ]

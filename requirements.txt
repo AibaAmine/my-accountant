@@ -20,3 +20,4 @@ dj-rest-auth[with_social]
 requests
 django-cloudinary-storage==0.3.0
 cloudinary
+django_extensions
