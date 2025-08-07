@@ -17,11 +17,8 @@ from dj_rest_auth.views import (
     LogoutView,
     PasswordChangeView,
 )
-from drf_yasg.utils import swagger_auto_schema
 from dj_rest_auth.views import UserDetailsView
 from rest_framework.parsers import MultiPartParser, FormParser
-
-LogoutView.get = swagger_auto_schema(auto_schema=None)(LogoutView.get)
 
 
 class CustomUserDetailsView(UserDetailsView):
@@ -91,4 +88,5 @@ urlpatterns = [
     path("profiles/", include("profiles.urls")),
     path("accounts/inactive/", account_inactive_view, name="account_inactive"),
     path("", include("bookings.urls")),
+    path("", include("services.urls")),
 ]
