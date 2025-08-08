@@ -1,12 +1,11 @@
 import uuid
 from django.db import models
 from accounts.models import User
-from cloudinary.models import CloudinaryField
 
 
 class ServiceCategory(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255, unique=True,blank=False,null=False)
+    name = models.CharField(max_length=255, unique=True, blank=False, null=False)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -23,7 +22,6 @@ class ServiceCategory(models.Model):
 
 
 class Service(models.Model):
-    
 
     SERVICE_TYPE_CHOICES = [
         ("needed", "Service Needed"),  # Client posting what they need
@@ -98,7 +96,9 @@ class Service(models.Model):
 
     # Additional details
     requirements_notes = models.TextField(blank=True)
-    attachments = CloudinaryField("file", null=True, blank=True)
+    attachments = models.FileField(
+        upload_to="service_attachments/", null=True, blank=True
+    )
 
     # Status
     is_active = models.BooleanField(default=True)

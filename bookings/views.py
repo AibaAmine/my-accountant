@@ -8,6 +8,7 @@ from .serializers import (
     BookingDetailSerializer,
     BookingUpdateSerializer,
 )
+from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
@@ -15,33 +16,32 @@ from rest_framework.exceptions import PermissionDenied
 from .models import Booking
 
 
-# todo add filtering and pagination, check if the service, accountant exists before booking
-
 class CreateBookingAPIView(generics.CreateAPIView):
     serializer_class = BookingCreateSerializer
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.user_type.lower() != "client":
-            raise PermissionDenied("Only clients can create bookings.")
 
-        serializer.save(client_id=user)
+        serializer.save()
 
 
 class UpdateBookingAPIView(generics.UpdateAPIView):
     serializer_class = BookingUpdateSerializer
     permission_classes = [IsAuthenticated]
-    queryset = Booking.objects.all()
+    lookup_field = "booking_id"
 
     def get_queryset(self):
-        return Booking.objects.filter(client_id=self.request.user)
-    
+        user = self.request.user
+        # Only allow updates on bookings where the user is a participant
+        return Booking.objects.filter(
+            Q(client=user) | Q(accountant=user)
+        ).select_related("service", "client", "accountant")
+
     def perform_update(self, serializer):
-        user = self.request.user    
-        if user.user_type.lower() != "client":
-            raise PermissionDenied("Only clients can update their bookings.")
-        serializer.save(client_id=user)
+
+        serializer.save()
+
 
 class BookingListAPIView(generics.ListAPIView):
     serializer_class = BookingListSerializer
@@ -49,25 +49,29 @@ class BookingListAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.user_type.lower() == "accountant":
-            return Booking.objects.filter(accountant_id=user)
-        elif user.user_type.lower() == "client":
-            return Booking.objects.filter(client_id=user)
-        else:
-            return Booking.objects.all()
+        qs = (
+            Booking.objects.all()
+            .select_related("service", "client", "accountant")
+            .order_by("-scheduled_start", "-created_at")
+        )
+
+        user_type = getattr(user, "user_type", "") or ""
+        if user_type.lower() == "accountant":
+            return qs.filter(accountant=user)
+        if user_type.lower() == "client":
+            return qs.filter(client=user)
+        return qs
 
 
 class BookingDetailAPIView(generics.RetrieveAPIView):
     serializer_class = BookingDetailSerializer
     permission_classes = [IsAuthenticated]
+    lookup_field = "booking_id"
 
-    def get_object(self):
-        user = self.request.user
-        if user.user_type.lower() == "accountant":
-            booking_id = self.kwargs.get("pk")
-            return get_object_or_404(Booking, booking_id=booking_id, accountant_id=user)
-        elif user.user_type.lower() == "client":
-            booking_id = self.kwargs.get("pk")
-            return get_object_or_404(Booking, booking_id=booking_id, client_id=user)
-        else:
-            return get_object_or_404(Booking, booking_id=booking_id)
+    def get_queryset(self):
+        user =self.request.user
+
+        # Only allow retrieval when the user is a participant
+        return Booking.objects.filter(
+            Q(client=user) | Q(accountant=user)
+        ).select_related("service", "client", "accountant")

@@ -11,11 +11,13 @@ from .models import Service, ServiceCategory
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 class ServiceCreateAPIView(generics.CreateAPIView):
     serializer_class = ServiceCreateSerializer
     permission_classes = [IsAuthenticated]
-    
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
     def perform_create(self, serializer):
         user = self.request.user
         serializer.save(user=user)
@@ -24,6 +26,7 @@ class ServiceCreateAPIView(generics.CreateAPIView):
 class ServiceUpdateAPIView(generics.UpdateAPIView):
     serializer_class=ServiceUpdateSerializer     
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     queryset= Service.objects.all()
     lookup_field="pk"
     

@@ -3,7 +3,8 @@ from .models import Service, ServiceCategory
 from accounts.serializers import CustomUserDetailsSerializer
 from django.utils import timezone
 
-#todo check if the service is active before allowing updates or deletions
+
+# add more data validation
 class ServiceCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceCategory
@@ -31,7 +32,7 @@ class ServiceListSerializer(serializers.ModelSerializer):
             "is_featured",
             "created_at",
         ]
-        read_only_fields = ("id", "created_at", "updated_at", "service_type")
+        read_only_fields = ("id", "created_at", "user", "updated_at", "service_type")
 
 
 class ServiceDetailSerializer(serializers.ModelSerializer):
@@ -45,7 +46,8 @@ class ServiceDetailSerializer(serializers.ModelSerializer):
 
 
 class ServiceCreateSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(write_only=True, required=False)
+    new_category_name = serializers.CharField(write_only=True, required=False)
+    new_category_description = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Service
@@ -56,7 +58,8 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "category",  # for existing category selection
-            "category_name",  # for new category creation
+            "new_category_name",  # for new category creation
+            "new_category_description",
             "price",
             "price_negotiable",
             "estimated_duration",
@@ -77,14 +80,19 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         user = self.context["request"].user
 
-        if not data.get("category") and not data.get("category_name"):
+        if not data.get("category") and not data.get("new_category_name"):
             raise serializers.ValidationError(
                 "Either select an existing category or add new one"
             )
 
-        if data.get("category") and data.get("category_name"):
+        if data.get("category") and data.get("new_category_name"):
             raise serializers.ValidationError(
                 "Either select category or create new one not both"
+            )
+
+        if not data.get("new_category_name") and data.get("new_category_description"):
+            raise serializers.ValidationError(
+                "If you provide a new category description, you must also provide a new category name."
             )
 
         if user.user_type.lower() == "client":
@@ -105,13 +113,18 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        category_name = validated_data.pop("category_name", None)
+        new_category_name = validated_data.pop("new_category_name", None)
+        new_category_description = validated_data.pop("new_category_description", None)
 
-        if category_name:
+        if new_category_name:
             category, created = ServiceCategory.objects.get_or_create(
-                name=category_name.strip(),
+                name=new_category_name.strip(),
                 defaults={
-                    "description": f"Category created by user: {validated_data.get('title', '')}"
+                    "description": (
+                        new_category_description.strip()
+                        if new_category_description
+                        else f"Category created for service: {validated_data.get('title', '')}"
+                    )
                 },
             )
             validated_data["category"] = category
@@ -120,6 +133,19 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
+
+        if instance.attachments:
+            representation["attachments"] = {
+                "url": instance.attachments.url,
+                "filename": (
+                    instance.attachments.name.split("/")[-1]
+                    if instance.attachments.name
+                    else "file"
+                ),
+            }
+        else:
+            representation["attachments"] = None
+
         # Include the full category object in response
         if instance.category:
             representation["category"] = ServiceCategorySerializer(
@@ -129,9 +155,10 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
 
 
 class ServiceUpdateSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(
+    new_category_name = serializers.CharField(
         required=False, write_only=True
     )  # allow users to add new service category when updating their existing service
+    new_category_description = serializers.CharField(required=False, write_only=True)
 
     class Meta:
         model = Service
@@ -142,7 +169,8 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "category",
-            "category_name",
+            "new_category_name",
+            "new_category_description",
             "price",
             "price_negotiable",
             "estimated_duration",
@@ -167,11 +195,18 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
             )
 
         if service.is_active is False:
-            raise serializers.ValidationError("This service is not active and cannot be updated.")
+            raise serializers.ValidationError(
+                "This service is not active and cannot be updated."
+            )
 
-        if data.get("category") and data.get("category_name"):
+        if data.get("category") and data.get("new_category_name"):
             raise serializers.ValidationError(
                 "Please either select an existing category OR create a new one, not both."
+            )
+
+        if not data.get("new_category_name") and data.get("new_category_description"):
+            raise serializers.ValidationError(
+                "If you provide a new category description, you must also provide a new category name."
             )
 
         if "price" in data and data["price"] and data["price"] < 0:
@@ -204,13 +239,18 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
         return representation
 
     def update(self, instance, validated_data):
-        category_name = validated_data.pop("category_name", None)
+        new_category_name = validated_data.pop("new_category_name", None)
+        new_category_description = validated_data.pop("new_category_description", None)
 
-        if category_name:
+        if new_category_name:
             category, created = ServiceCategory.objects.get_or_create(
-                name=category_name.strip(),
+                name=new_category_name.strip(),
                 defaults={
-                    "description": f"Category created for service: {instance.title}"
+                    "description": (
+                        new_category_description.strip()
+                        if new_category_description
+                        else f"Category created for service: {instance.title}"
+                    )
                 },
             )
             validated_data["category"] = category
