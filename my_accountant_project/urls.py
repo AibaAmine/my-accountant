@@ -88,5 +88,5 @@ urlpatterns = [
     path("profiles/", include("profiles.urls")),
     path("accounts/inactive/", account_inactive_view, name="account_inactive"),
     path("", include("bookings.urls")),
-    path("", include("services.urls")),
+    path("services/", include("services.urls")),
 ]

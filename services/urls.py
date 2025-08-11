@@ -4,21 +4,25 @@ from .views import (
     ServiceUpdateAPIView,
     UserServiceListAPIView,
     ServiceDeleteAPIView,
+    PublicServiceDetailAPIView,
+    PublicServiceListAPIView
 )
 from django.urls import path
 
 urlpatterns = [
-    path("services/me/", UserServiceListAPIView.as_view(), name="service-list"),
-    path("services/<uuid:pk>/", ServiceDetailAPIView.as_view(), name="service-detail"),
-    path("services/create/", ServiceCreateAPIView.as_view(), name="service-create"),
+    path("my/", UserServiceListAPIView.as_view(), name="service-list"),
+    path("my/<uuid:pk>/", ServiceDetailAPIView.as_view(), name="service-detail"),
+    path("create/", ServiceCreateAPIView.as_view(), name="service-create"),
     path(
-        "services/<uuid:pk>/update/",
+        "<uuid:pk>/update/",
         ServiceUpdateAPIView.as_view(),
         name="service-update",
     ),
     path(
-        "services/<uuid:pk>/delete/",
+        "<uuid:pk>/delete/",
         ServiceDeleteAPIView.as_view(),
         name="service-delete",
     ),
+    path("browse/",PublicServiceListAPIView.as_view(),name="service_browse"),
+    path("browse/<uuid:pk>/",PublicServiceDetailAPIView.as_view(),name="service_view")
 ]
