@@ -12,6 +12,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+from .filters import ServiceFilter
+
 
 class ServiceCreateAPIView(generics.CreateAPIView):
     serializer_class = ServiceCreateSerializer
@@ -42,6 +46,17 @@ class ServiceUpdateAPIView(generics.UpdateAPIView):
 class PublicServiceListAPIView(generics.ListAPIView):
     serializer_class = ServiceListSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = ServiceFilter
+    search_fields = [
+        "title",
+        "description",
+        "skills_keywords",
+        "user__full_name",
+        "category__name",
+    ]
+    ordering_fields = ["created_at", "price", "urgency_level", "estimated_duration"]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
         user = self.request.user
@@ -55,7 +70,13 @@ class PublicServiceListAPIView(generics.ListAPIView):
             return Service.objects.filter(
                 is_active=True, service_type="needed"
             ).exclude(user=user)
+        return Service.objects.none()
+
+    def get_matching_users(self,search_term):
         return None
+
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 
 class PublicServiceDetailAPIView(generics.RetrieveAPIView):

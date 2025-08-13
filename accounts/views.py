@@ -8,7 +8,15 @@ from .serializers import (
     VerifyEmailOTPSerializer,
     PasswordResetRequestSerializer,
     VerifyPasswordResetSerializer,
+    CustomUserDetailsSerializer,
 )
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
+from rest_framework.filters import SearchFilter, OrderingFilter
+import django_filters
+from .filters import UserFilter
+
 
 User = get_user_model()
 
@@ -67,3 +75,36 @@ class VerifyPasswordResetAPIView(APIView):
         return Response(
             {"detail": "Password reset successfully."}, status=status.HTTP_200_OK
         )
+
+
+class UserSearchAPIView(generics.ListAPIView):
+    """User search - separate from service search"""
+
+    serializer_class = CustomUserDetailsSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [
+        django_filters.rest_framework.DjangoFilterBackend,
+        SearchFilter,
+        OrderingFilter,
+    ]
+    filterset_class = UserFilter
+    search_fields = ["full_name", "company_name", "email"]
+    ordering_fields = ["full_name", "created_at"]
+    ordering = ["full_name"]
+
+    def get_queryset(self):
+        user = self.request.user
+        role = (getattr(user, "user_type", "") or "").lower()
+
+        base_queryset = User.objects.filter(
+            account_status="active", is_email_verified=True
+        ).exclude(id=user.id)
+
+        if role == "client":
+            # Clients can search for accountants
+            return base_queryset.filter(user_type="accountant")
+        elif role == "accountant":
+            # Accountants can search for clients
+            return base_queryset.filter(user_type="client")
+
+        return User.objects.none()
