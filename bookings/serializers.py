@@ -4,6 +4,7 @@ from django.utils import timezone
 from services.serializers import ServiceDetailSerializer
 from accounts.serializers import CustomUserDetailsSerializer
 from django.db.models import Q
+from services.serializers import ServiceDetailSerializer
 
 
 class BookingDetailSerializer(serializers.ModelSerializer):
@@ -38,13 +39,14 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["booking_id", "created_at", "updated_at"]
 
+        # todo :prevent users from booking the same service mutiple times.
+
     def validate(self, data):
         request = self.context.get("request")
         service = data.get("service")
 
         if service is None:
             raise serializers.ValidationError({"service": "This field is required."})
-
         req_role = (getattr(request.user, "user_type", "") or "").lower()
 
         if service.service_type == "offered":
@@ -54,19 +56,16 @@ class BookingCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Only a client can book an offered service."
                 )
-            if request.user == service.user:
-                raise serializers.ValidationError(
-                    "You cannot book your own offered service."
-                )
+            
             if not data.get("scheduled_start") or not data.get("scheduled_end"):
                 raise serializers.ValidationError(
                     "scheduled_start and scheduled_end are required for offered services."
                 )
 
-            if data.get("agreed_price") is None:  # new
+            if data.get("agreed_price") is None:
                 raise serializers.ValidationError(
                     {"agreed_price": "Price required for offered service booking."}
-                )  # new
+                )
 
         elif service.service_type == "needed":
             if req_role != "accountant":
@@ -116,7 +115,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         if start and end:
             if Booking.objects.filter(
                 accountant=accountant,
-                status__in=["pending", "proposed", "confirmed", "in_progress"],
+                status__in=["confirmed", "in_progress"],
                 scheduled_start__lt=end,
                 scheduled_end__gt=start,
             ).exists():
@@ -218,8 +217,6 @@ class BookingUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Only participants can cancel the booking."
                 )
-
-    
 
         return data
 

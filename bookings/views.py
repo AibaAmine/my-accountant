@@ -71,7 +71,7 @@ class BookingDetailAPIView(generics.RetrieveAPIView):
     def get_queryset(self):
         user =self.request.user
 
-        # Only allow retrieval when the user is a participant
+        # Only allow retrieval when the user is a participant 
         return Booking.objects.filter(
             Q(client=user) | Q(accountant=user)
         ).select_related("service", "client", "accountant")
