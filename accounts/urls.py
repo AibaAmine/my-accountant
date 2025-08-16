@@ -17,5 +17,5 @@ urlpatterns = [
         VerifyPasswordResetAPIView.as_view(),
         name="verify-password-reset",
     ),
-    path("search/", UserSearchAPIView.as_view(), name="user-search"),
+    path("users/", UserSearchAPIView.as_view(), name="user-search"),
 ]

@@ -5,7 +5,6 @@ from .models import User
 
 class UserFilter(django_filters.FilterSet):
     search = django_filters.CharFilter(method="filter_search", label="Search")
-    user_type = django_filters.ChoiceFilter(choices=User.USER_TYPE_CHOICES)
 
     class Meta:
         model = User

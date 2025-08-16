@@ -72,12 +72,6 @@ class PublicServiceListAPIView(generics.ListAPIView):
             ).exclude(user=user)
         return Service.objects.none()
 
-    def get_matching_users(self,search_term):
-        return None
-
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
 
 class PublicServiceDetailAPIView(generics.RetrieveAPIView):
     serializer_class = ServiceDetailSerializer

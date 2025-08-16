@@ -15,11 +15,6 @@ class ServiceFilter(django_filters.FilterSet):
         to_field_name="id",
     )
 
-    # Service type filter (needed/offered)
-    service_type = django_filters.MultipleChoiceFilter(
-        choices=Service.SERVICE_TYPE_CHOICES, field_name="service_type"
-    )
-
     # Location preference filters
     location_preference = django_filters.MultipleChoiceFilter(
         choices=Service.LOCATION_CHOICES, field_name="location_preference"
@@ -70,7 +65,6 @@ class ServiceFilter(django_filters.FilterSet):
         fields = [
             "search",
             "category",
-            "service_type",
             "location_preference",
             "experience_level_required",
             "urgency_level",

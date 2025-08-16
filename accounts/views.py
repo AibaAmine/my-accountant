@@ -20,7 +20,6 @@ from .filters import UserFilter
 
 User = get_user_model()
 
-
 class SendEmailOTPView(APIView):
     permission_classes = [AllowAny]
 
@@ -78,7 +77,6 @@ class VerifyPasswordResetAPIView(APIView):
 
 
 class UserSearchAPIView(generics.ListAPIView):
-    """User search - separate from service search"""
 
     serializer_class = CustomUserDetailsSerializer
     permission_classes = [IsAuthenticated]
@@ -94,17 +92,7 @@ class UserSearchAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        role = (getattr(user, "user_type", "") or "").lower()
-
-        base_queryset = User.objects.filter(
+        
+        return User.objects.filter(
             account_status="active", is_email_verified=True
         ).exclude(id=user.id)
-
-        if role == "client":
-            # Clients can search for accountants
-            return base_queryset.filter(user_type="accountant")
-        elif role == "accountant":
-            # Accountants can search for clients
-            return base_queryset.filter(user_type="client")
-
-        return User.objects.none()
