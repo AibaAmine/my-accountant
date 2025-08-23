@@ -1,0 +1,76 @@
+from django.urls import path
+from .views import (
+    AvailableUserListAPIView,
+    ChatRoomRetrieveUpdateDeleteAPIView,
+    GroupChatRoomListAPIView,
+    DirectMessageRoomListAPIView,
+    DirectMessageRoomAPIView,
+    RoomMessageListAPIView,
+    RoomMemberListAPIView,
+    GroupChatRoomCreateAPIView,
+    ChatRoomAddMemberAPIView,
+    ChatRoomRemoveMemberAPIView,
+    ChatMessageDeleteAPIView,
+    ChatMessageUpdateAPIView,
+)
+
+urlpatterns = [
+    path(
+        "available_users/", AvailableUserListAPIView.as_view(), name="available_users"
+    ),
+    path(
+        "chatrooms/group/",
+        GroupChatRoomListAPIView.as_view(),
+        name="group_chatroom_list",
+    ),
+    path(
+        "chatrooms/group/create/",
+        GroupChatRoomCreateAPIView.as_view(),
+        name="create_group_chat_room",
+    ),
+    path(
+        "chatrooms/<int:room_id>/",
+        ChatRoomRetrieveUpdateDeleteAPIView.as_view(),
+        name="chatroom_detail",
+    ),
+    path(
+        "chatrooms/group/<int:room_id>/add_member/",
+        ChatRoomAddMemberAPIView.as_view(),
+        name="add_member_to_group_chat_room",
+    ),
+    path(
+        "chatrooms/group/<int:room_id>/remove_member/",
+        ChatRoomRemoveMemberAPIView.as_view(),
+        name="remove_member_from_group_chat_room",
+    ),
+    path(
+        "chatrooms/<int:room_id>/messages/",
+        RoomMessageListAPIView.as_view(),
+        name="direct_message_room_messages",
+    ),
+    path(
+        "chatrooms/<int:room_id>/members/",
+        RoomMemberListAPIView.as_view(),
+        name="room_member_list",
+    ),
+    path(
+        "chatrooms/direct/",
+        DirectMessageRoomListAPIView.as_view(),
+        name="direct_message_room_list",
+    ),
+    path(
+        "chatrooms/direct/create/",
+        DirectMessageRoomAPIView.as_view(),
+        name="create_direct_message_room",
+    ),
+    path(
+        "chatrooms/messages/<uuid:message_id>/delete/",
+        ChatMessageDeleteAPIView.as_view(),
+        name="delete_chat_message",
+    ),
+    path(
+        "chatrooms/messages/<uuid:message_id>/update/",
+        ChatMessageUpdateAPIView.as_view(),
+        name="update_chat_message",
+    ),
+]

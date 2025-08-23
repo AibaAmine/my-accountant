@@ -19,7 +19,7 @@ class User(AbstractUser):
         choices=[
             ("client", "Client"),
             ("accountant", "Accountant"),
-            ("student", "Student"),
+            ("academic", "Academic"),
             ("admin", "Admin"),
         ],
         default="client",

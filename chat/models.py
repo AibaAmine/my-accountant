@@ -8,7 +8,17 @@ class ChatRooms(models.Model):
     room_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     room_name = models.CharField(max_length=255, unique=True)
     is_private = models.BooleanField(default=False)
+    is_dm = models.BooleanField(default=False)  
+
     created_at = models.DateTimeField(auto_now_add=True)
+
+    creator = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="created_chat_rooms",
+        null=True,  # Allow rooms to exist without a creator
+        blank=True,
+    )
 
     class Meta:
         db_table = "chat_rooms"
@@ -24,7 +34,7 @@ class ChatMembers(models.Model):
     room_member_id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False
     )
-    room_id = models.ForeignKey(ChatRooms, on_delete=models.CASCADE)
+    room_id = models.ForeignKey(ChatRooms, on_delete=models.CASCADE,related_name="members")
     user_id = models.ForeignKey(User, on_delete=models.CASCADE)
     joined_at = models.DateTimeField(auto_now_add=True)
 

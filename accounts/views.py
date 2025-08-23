@@ -96,3 +96,4 @@ class UserSearchAPIView(generics.ListAPIView):
         return User.objects.filter(
             account_status="active", is_email_verified=True
         ).exclude(id=user.id)
+

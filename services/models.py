@@ -20,7 +20,7 @@ class ServiceCategory(models.Model):
     def __str__(self):
         return self.name
 
-
+#add location field
 class Service(models.Model):
 
     SERVICE_TYPE_CHOICES = [
@@ -56,6 +56,7 @@ class Service(models.Model):
         ("high", "High Priority"),
         ("urgent", "Urgent"),
     ]
+    
 
     # Primary fields
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
