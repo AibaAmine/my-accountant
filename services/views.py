@@ -3,6 +3,7 @@ from .serializers import (
     ServiceDetailSerializer,
     ServiceCreateSerializer,
     ServiceUpdateSerializer,
+    ServiceCategorySerializer,
 )
 
 from rest_framework import generics
@@ -145,3 +146,29 @@ class ServiceDeleteAPIView(generics.DestroyAPIView):
                 {"detail": "Service not found or already deleted."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+
+class ServiceCategoryListAPIView(generics.ListAPIView):
+    """
+    List all active service categories
+    """
+
+    serializer_class = ServiceCategorySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ServiceCategory.objects.filter(is_active=True).order_by("name")
+
+
+class ServiceCategoryDetailAPIView(generics.RetrieveAPIView):
+    """
+    Get a specific category by ID.
+
+    """
+
+    serializer_class = ServiceCategorySerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "pk"
+
+    def get_queryset(self):
+        return ServiceCategory.objects.filter(is_active=True)
