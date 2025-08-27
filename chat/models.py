@@ -3,13 +3,14 @@ from django.db import models
 from accounts.models import User
 
 
+# add description field
 class ChatRooms(models.Model):
 
     room_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     room_name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, null=True)
     is_private = models.BooleanField(default=False)
-    is_dm = models.BooleanField(default=False)  
-
+    is_dm = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     creator = models.ForeignKey(
@@ -34,8 +35,12 @@ class ChatMembers(models.Model):
     room_member_id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False
     )
-    room_id = models.ForeignKey(ChatRooms, on_delete=models.CASCADE,related_name="members")
-    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    room_id = models.ForeignKey(
+        ChatRooms, on_delete=models.CASCADE, related_name="members"
+    )
+    user_id = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="chat_memberships"
+    )
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -74,7 +79,6 @@ class ChatMessages(models.Model):
         db_table = "chat_message"
         verbose_name = "Chat Message"
         verbose_name_plural = "Chat Messages"
-       
 
     def __str__(self):
         return f"Message from {self.sender_id.username} in {self.room_id.room_name}"

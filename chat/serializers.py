@@ -9,6 +9,7 @@ User = get_user_model()
 class ChatRoomSerializer(serializers.ModelSerializer):
     creator = CustomUserDetailsSerializer(read_only=True)
     message_count = serializers.SerializerMethodField()
+    members_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatRooms
@@ -20,6 +21,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             "description",
             "is_private",
             "is_dm",
+            "members_count",
             "message_count",
         ]
         read_only_fields = [
@@ -28,11 +30,15 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             "created_at",
             "is_private",
             "is_dm",
+            "members_count",
             "message_count",
         ]
 
     def get_message_count(self, obj):
         return obj.messages.count()
+    
+    def get_members_count(self, obj):
+        return obj.members.count()
 
 
 class ChatRoomCreateSerializer(serializers.ModelSerializer):
@@ -46,7 +52,6 @@ class ChatRoomUpdateSerializer(serializers.ModelSerializer):
         model = ChatRooms
         fields = ["room_name", "description", "is_private"]
         read_only_fields = ["room_id", "created_at", "creator", "is_dm"]
-
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):

@@ -29,27 +29,27 @@ urlpatterns = [
         name="create_group_chat_room",
     ),
     path(
-        "chatrooms/<int:room_id>/",
+        "chatrooms/<uuid:room_id>/",
         ChatRoomRetrieveUpdateDeleteAPIView.as_view(),
         name="chatroom_detail",
     ),
     path(
-        "chatrooms/group/<int:room_id>/add_member/",
+        "chatrooms/group/<uuid:room_id>/add_member/",
         ChatRoomAddMemberAPIView.as_view(),
         name="add_member_to_group_chat_room",
     ),
     path(
-        "chatrooms/group/<int:room_id>/remove_member/",
+        "chatrooms/group/<uuid:room_id>/remove_member/<uuid:user_id_to_remove>/",
         ChatRoomRemoveMemberAPIView.as_view(),
         name="remove_member_from_group_chat_room",
     ),
     path(
-        "chatrooms/<int:room_id>/messages/",
+        "chatrooms/<uuid:room_id>/messages/",
         RoomMessageListAPIView.as_view(),
         name="direct_message_room_messages",
     ),
     path(
-        "chatrooms/<int:room_id>/members/",
+        "chatrooms/<uuid:room_id>/members/",
         RoomMemberListAPIView.as_view(),
         name="room_member_list",
     ),

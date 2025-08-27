@@ -11,8 +11,8 @@ from .serializers import (
     ChatMessageUpdateSerializer,
     ChatMessageDeleteSerializer,
 )
-from .models import ChatRooms, ChatMessages
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from .models import ChatRooms, ChatMessages, ChatMembers
+from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
@@ -29,6 +29,7 @@ User = get_user_model()
 
 
 #!missing endpoints
+# optional : add api endpoint to delete dm rooms
 # Room Members Count - GET /api/chat/rooms/{id}/members/count/ for UI badges
 
 # Unread Messages Count - GET /api/chat/unread-count/ for notifications
@@ -69,8 +70,8 @@ class GroupChatRoomListAPIView(generics.ListAPIView):
                 is_dm=False,
             )
             .exclude(room_name__startswith="dm_")  # list only rooms
-            .annotate(  # this find the most recent message from any user in that room
-                last_mesasge_time=models.Max("messages__sent_at")
+            .annotate(  # this finds the most recent message time from any user in that room
+                last_message_time=models.Max("messages__sent_at")
             )
             .order_by("-last_message_time")
         )
@@ -114,15 +115,19 @@ class GroupChatRoomCreateAPIView(generics.CreateAPIView):
         user = self.request.user
         if not can_create_rooms(user):
             raise PermissionDenied("You do not have permission to create chat rooms.")
-        serializer.save(creator=user)
+        # Create the room and then add the creator as a member
+        room = serializer.save(creator=user)
+        # Ensure the creator is a room member
+        ChatMembers.objects.create(room_id=room, user_id=user)
 
 
-# Chat Room Retrieve, Update, Delete
+# Chat group Rooms Retrieve, Update, Delete
 class ChatRoomRetrieveUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ChatRooms.objects.all()
     serializer_class = ChatRoomSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
+    lookup_field = "room_id"
 
     def get_object(self):
         obj = super().get_object()
@@ -147,25 +152,18 @@ class ChatRoomAddMemberAPIView(views.APIView):
 
     def post(self, request, room_id):
         room = get_object_or_404(ChatRooms, room_id=room_id)
+        
+        if room.is_dm:
+            raise PermissionDenied("You cannot add members to a direct message room.")
 
+        #! change this for admin users
         if room.creator != request.user:
             raise PermissionDenied(
                 "You do not have permission to add members to this room."
             )
 
-        if not room.is_private:
-            return Response(
-                {"detail": "Members can only be added to private chat rooms."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         target_user_id = request.data.get("user_id")
-        if not target_user_id:
-            return Response(
-                {"detail": "User ID to add is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+        
         target_user = get_object_or_404(User, id=target_user_id)
 
         # Check if the target user can be added
@@ -177,21 +175,20 @@ class ChatRoomAddMemberAPIView(views.APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if room.members.filter(id=target_user.id).exists():
+        if room.members.filter(user_id=target_user).exists():
             return Response(
                 {"detail": f"{target_user.username} is already a member of this room."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        room.members.add(target_user)
+        ChatMembers.objects.create(room_id=room, user_id=target_user)
 
         serializer = ChatRoomSerializer(room)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response("User added successfully", status=status.HTTP_200_OK)
 
 
 class ChatRoomRemoveMemberAPIView(views.APIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]    
 
     def delete(self, request, room_id, user_id_to_remove):
         room = get_object_or_404(ChatRooms, room_id=room_id)
@@ -217,33 +214,27 @@ class ChatRoomRemoveMemberAPIView(views.APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not room.members.filter(id=target_user.id).exists():
+        if not room.members.filter(user_id=target_user).exists():
             return Response(
                 {"detail": f"{target_user.username} is not a member of this room."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        room.members.remove(target_user)
+        room.members.filter(user_id=target_user).delete()
 
         serializer = ChatRoomSerializer(room)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-# creating getting dm rooms
+# creating fetching dm rooms
 class DirectMessageRoomAPIView(views.APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-
+    
     def post(self, request):
 
         current_user = request.user
+        
         target_user_id = request.data.get("target_user_id")
-
-        if not target_user_id:
-            return Response(
-                {"error": "target_user_id is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         target_user = get_object_or_404(User, id=target_user_id)
 
@@ -267,48 +258,46 @@ class DirectMessageRoomAPIView(views.APIView):
 
         # try to find and existing private room with these two members
         try:
-            dm_room = ChatRooms.objects.get(room_name=dm_room_name, is_private=True)
-
-            dm_room.members.set([current_user, target_user])
-
+            dm_room = ChatRooms.objects.get(room_name=dm_room_name, is_private=True, is_dm=True)
+            
+            
         except ChatRooms.DoesNotExist:
             dm_room = ChatRooms.objects.create(
                 room_name=dm_room_name,
-                description=f"Direct message between {current_user.username} and {target_user.username}",
+                description=f"Direct message between {current_user.full_name} and {target_user.full_name}",
                 is_private=True,
                 is_dm=True,
                 creator=current_user,
             )
 
-            dm_room.members.set([current_user, target_user])
-            print(f"Created new DM room :{dm_room_name}")
+            # Add the two users as members
+            ChatMembers.objects.create(room_id=dm_room, user_id=current_user)
+            ChatMembers.objects.create(room_id=dm_room, user_id=target_user)
 
         serializer = ChatRoomSerializer(dm_room)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+
+#!add pagination and search options
 class RoomMemberListAPIView(generics.ListAPIView):
 
     serializer_class = CustomUserDetailsSerializer
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-
     def get_queryset(self):
         room_id = self.kwargs.get("room_id")
         room = get_object_or_404(ChatRooms, room_id=room_id)
 
-        if not room.members.filter(id=self.request.user.id).exists():
+        if not room.members.filter(user_id=self.request.user).exists():
             raise PermissionDenied("You are not a member of this room.")
 
-        return room.members.all()
+        return User.objects.filter(chat_memberships__room_id=room)
 
 
-# add search and ordering and pagination
 class RoomMessageListAPIView(generics.ListAPIView):
     serializer_class = ChatMessageSerializer
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
     pagination_class = PageNumberPagination
     page_size = 20
     ordering = ["-sent_at"]
@@ -319,7 +308,7 @@ class RoomMessageListAPIView(generics.ListAPIView):
         room_id = self.kwargs.get("room_id")
         room = get_object_or_404(ChatRooms, room_id=room_id)
 
-        if not room.members.filter(id=self.request.user.id).exists():
+        if not room.members.filter(user_id=self.request.user).exists():
             raise PermissionDenied("You are not a member of this room.")
 
         return room.messages.all()
@@ -409,5 +398,3 @@ def can_create_rooms(user):
 def can_access_rooms(user):
     """Clients cannot access rooms at all"""
     return user.user_type != "client"
-
-
