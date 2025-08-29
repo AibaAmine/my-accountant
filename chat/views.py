@@ -152,7 +152,7 @@ class ChatRoomAddMemberAPIView(views.APIView):
 
     def post(self, request, room_id):
         room = get_object_or_404(ChatRooms, room_id=room_id)
-        
+
         if room.is_dm:
             raise PermissionDenied("You cannot add members to a direct message room.")
 
@@ -163,7 +163,7 @@ class ChatRoomAddMemberAPIView(views.APIView):
             )
 
         target_user_id = request.data.get("user_id")
-        
+
         target_user = get_object_or_404(User, id=target_user_id)
 
         # Check if the target user can be added
@@ -188,7 +188,7 @@ class ChatRoomAddMemberAPIView(views.APIView):
 
 
 class ChatRoomRemoveMemberAPIView(views.APIView):
-    permission_classes = [IsAuthenticated]    
+    permission_classes = [IsAuthenticated]
 
     def delete(self, request, room_id, user_id_to_remove):
         room = get_object_or_404(ChatRooms, room_id=room_id)
@@ -229,11 +229,11 @@ class ChatRoomRemoveMemberAPIView(views.APIView):
 # creating fetching dm rooms
 class DirectMessageRoomAPIView(views.APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
 
         current_user = request.user
-        
+
         target_user_id = request.data.get("target_user_id")
 
         target_user = get_object_or_404(User, id=target_user_id)
@@ -258,9 +258,10 @@ class DirectMessageRoomAPIView(views.APIView):
 
         # try to find and existing private room with these two members
         try:
-            dm_room = ChatRooms.objects.get(room_name=dm_room_name, is_private=True, is_dm=True)
-            
-            
+            dm_room = ChatRooms.objects.get(
+                room_name=dm_room_name, is_private=True, is_dm=True
+            )
+
         except ChatRooms.DoesNotExist:
             dm_room = ChatRooms.objects.create(
                 room_name=dm_room_name,
@@ -279,12 +280,12 @@ class DirectMessageRoomAPIView(views.APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-
 #!add pagination and search options
 class RoomMemberListAPIView(generics.ListAPIView):
 
     serializer_class = CustomUserDetailsSerializer
     permission_classes = [IsAuthenticated]
+
     def get_queryset(self):
         room_id = self.kwargs.get("room_id")
         room = get_object_or_404(ChatRooms, room_id=room_id)
@@ -317,20 +318,29 @@ class RoomMessageListAPIView(generics.ListAPIView):
 class ChatMessageUpdateAPIView(generics.UpdateAPIView):
     queryset = ChatMessages.objects.all()
     serializer_class = ChatMessageUpdateSerializer
-    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     lookup_field = "message_id"
 
     def get_queryset(self):
-        return ChatMessages.objects.filter(sender=self.request.user, is_deleted=False)
+        user = self.request.user
+        return ChatMessages.objects.filter(sender=user, is_deleted=False)
+    
+    def get_object(self):
+        obj = super().get_object()
+        if obj.sender != self.request.user:
+            raise PermissionDenied("You do not have permission to edit this message.")
+        if obj.is_deleted:
+            raise PermissionDenied("You cannot edit a deleted message.")
+
+        if not obj:
+            raise PermissionDenied("Message not found.")
+        return obj
 
     def perform_update(self, serializer):
         updated_message = serializer.save()
-
-        room_group_name = f"chat_{updated_message.room.room_name}"
-
+        # Notify channel layer that a message was edited
+        room_group_name = f"chat_{updated_message.room.room_id}"
         channel_layer = get_channel_layer()
-
         async_to_sync(channel_layer.group_send)(
             room_group_name,
             {
@@ -340,36 +350,45 @@ class ChatMessageUpdateAPIView(generics.UpdateAPIView):
                 "edited_at": updated_message.edited_at.isoformat(),
                 "room_id": str(updated_message.room.room_id),
                 "sender_id": str(updated_message.sender.id),
-                "sender_username": updated_message.sender.username,
+                "sender_full_name": updated_message.sender.full_name,
             },
         )
 
 
+#!add proper responses for permission checks
 class ChatMessageDeleteAPIView(generics.DestroyAPIView):
     queryset = ChatMessages.objects.all()
     serializer_class = ChatMessageDeleteSerializer
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
     lookup_field = "message_id"
 
     def get_queryset(self):
         return ChatMessages.objects.filter(sender=self.request.user, is_deleted=False)
+    
+    def get_object(self):
+        obj = super().get_object()
+        if obj.sender != self.request.user:
+            raise PermissionDenied("You do not have permission to delete this message.")
+        
+        if not obj or obj.is_deleted:
+            raise PermissionDenied("Message not found or already deleted.")
+        return obj
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
         instance.content = "This message has been deleted"
         instance.edited_at = datetime.now()
         instance.save()
-
-        room_group_name = f"chat_{instance.room.room_name}"
+        # Notify channel layer that a message was deleted
+        room_group_name = f"chat_{instance.room.room_id}"
         channel_layer = get_channel_layer()
-
         async_to_sync(channel_layer.group_send)(
             room_group_name,
             {
                 "type": "message_deleted",
                 "message_id": str(instance.message_id),
                 "room_id": str(instance.room.room_id),
+                "edited_at": instance.edited_at.isoformat(),
             },
         )
 

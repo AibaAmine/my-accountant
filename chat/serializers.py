@@ -6,6 +6,7 @@ from accounts.serializers import CustomUserDetailsSerializer
 
 User = get_user_model()
 
+
 class ChatRoomSerializer(serializers.ModelSerializer):
     creator = CustomUserDetailsSerializer(read_only=True)
     message_count = serializers.SerializerMethodField()
@@ -36,7 +37,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
 
     def get_message_count(self, obj):
         return obj.messages.count()
-    
+
     def get_members_count(self, obj):
         return obj.members.count()
 
@@ -46,6 +47,7 @@ class ChatRoomCreateSerializer(serializers.ModelSerializer):
         model = ChatRooms
         fields = ["room_name", "description", "is_private"]
         read_only_fields = ["room_id", "created_at", "creator", "is_dm"]
+
 
 class ChatRoomUpdateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -57,6 +59,7 @@ class ChatRoomUpdateSerializer(serializers.ModelSerializer):
 class ChatMessageSerializer(serializers.ModelSerializer):
     sender = CustomUserDetailsSerializer(read_only=True)
     room = ChatRoomSerializer(read_only=True)
+    timestamp = serializers.DateTimeField(source="sent_at", read_only=True)
 
     class Meta:
         model = ChatMessages
@@ -84,7 +87,7 @@ class ChatMessageUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatMessages
         fields = ["content"]
-        read_only_fields = ["message_id", "room", "sender", "timestamp", "is_deleted"]
+        read_only_fields = ["message_id", "room", "sender", "sent_at", "is_deleted"]
 
     def update(self, instance, validated_data):
         # Update the content

@@ -7,7 +7,7 @@ from accounts.models import User
 class ChatRooms(models.Model):
 
     room_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    room_name = models.CharField(max_length=255, unique=True)
+    room_name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     is_private = models.BooleanField(default=False)
     is_dm = models.BooleanField(default=False)
@@ -56,10 +56,10 @@ class ChatMembers(models.Model):
 class ChatMessages(models.Model):
 
     message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    room_id = models.ForeignKey(
+    room = models.ForeignKey(
         ChatRooms, on_delete=models.CASCADE, related_name="messages"
     )
-    sender_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    sender = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
     message_type = models.CharField(
         max_length=50,
@@ -74,6 +74,8 @@ class ChatMessages(models.Model):
     sent_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
     is_edited = models.BooleanField(default=False)
+    
+    edited_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "chat_message"
@@ -81,4 +83,4 @@ class ChatMessages(models.Model):
         verbose_name_plural = "Chat Messages"
 
     def __str__(self):
-        return f"Message from {self.sender_id.username} in {self.room_id.room_name}"
+        return f"Message from {self.sender.id} in {self.room_id.room_name}"

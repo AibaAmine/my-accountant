@@ -2,7 +2,7 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import AnonymousUser
 from datetime import datetime
-from .models import ChatMessage, ChatRoom
+from .models import ChatMessages, ChatRooms
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 
@@ -15,35 +15,30 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)  # 4001 : unauthorized
             return
 
-        self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
-        self.room_group_name = f"chat_{self.room_name}"
+        self.room_id = self.scope["url_route"]["kwargs"]["room_id"]
+        self.room_group_name = f"chat_{self.room_id}"
 
-        is_dm_room = self.room_name.startswith("dm_")
-
-        # get the room instance or create it if its not founded
-        self.room_obj = await self.get_or_create_room(
-            self.room_name, is_dm_room=is_dm_room
-        )
+        # get the room instance
+        self.room_obj = await self.get_room(self.room_id)
 
         if not self.room_obj:
             await self.close(code=4000)  # could not get /create room
             return
 
         # Dm specific authorization check
-        if self.room_obj.is_private:
-            if not await self.is_user_member_of_room(self.room_obj, self.scope["user"]):
-                print(
-                    f"User {self.scope['user'].username} tried to access private room {self.room_name} but is not a member."
-                )
-                await self.close(code=4003)  # 4003 :Forbidden access
-                return
+        if self.room_obj.is_private and not await self.is_user_member_of_room(
+            self.room_obj, self.scope["user"]
+        ):
+
+            await self.close(code=4003)  # 4003 :Forbidden access
+            return
 
         # Join room group
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
 
         await self.accept()
         print(
-            f"WebSocket CONNECT /ws/chat/{self.room_name}/ [User: {self.scope['user'].username}]"
+            f"WebSocket CONNECT /ws/chat/{self.room_id}/ [User: {self.scope['user'].id}]"
         )
 
         # store the user id in a redis set
@@ -51,7 +46,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             str(self.room_obj.room_id), str(self.scope["user"].id)
         )
 
-        # send the initial full user list to the joining clinet
+        # send the initial full user list to the joining client
         await self.send_current_room_users()
 
         # Broadcast User join to Others in the room
@@ -59,9 +54,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             {
                 "type": "user.join",
-                # FIX: Correctly access user ID and username from self.scope["user"]
                 "user_id": str(self.scope["user"].id),
-                "username": self.scope["user"].username,
+                "full_name": self.scope["user"].full_name,
             },
         )
 
@@ -75,7 +69,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name, self.channel_name
             )
             print(
-                f"WebSocket DISCONNECT /ws/chat/{self.room_name}/ [User: {self.scope['user'].username}] Code: {close_code}"
+                f"WebSocket DISCONNECT /ws/chat/{self.room_id}/ [User: {self.scope['user'].id}] Code: {close_code}"
             )
 
             # remove User from Redis presence
@@ -90,7 +84,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     "type": "user.leave",
                     "user_id": str(self.scope["user"].id),
-                    "username": self.scope["user"].username,
+                    "full_name": self.scope["user"].full_name,
                 },
             )
 
@@ -115,7 +109,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def handle_chat_message(self, data):
         try:
-            # new format {"type": "message", "content": "text"
             message_content = data.get("content")
             if not message_content:
                 await self.send(
@@ -125,7 +118,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             # save msg to db
             created_msg = await self.save_chat_message(
-                room=self.room_obj, sender=self.scope["user"], content=message_content
+                room=self.room_obj,
+                sender=self.scope["user"],
+                content=message_content,
             )
 
             # Send message to room group
@@ -135,10 +130,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "type": "chat_message",
                     "message_id": str(created_msg.message_id),
                     "message": created_msg.content,
-                    "sender_id": str(created_msg.sender),
-                    "sender_username": self.scope["user"].username,
+                    "sender_id": str(created_msg.sender.id),
+                    "sender_full_name": created_msg.sender.full_name,
                     "timestamp": datetime.now().isoformat(),
-                    "edited_at": None,
+                    "edited_at": (
+                        created_msg.edited_at.isoformat()
+                        if created_msg.edited_at
+                        else None
+                    ),
                     "is_deleted": False,
                 },
             )
@@ -161,24 +160,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             {
                 "type": "typing.indicator",
-                "user": self.scope["user"].username,
+                "user": self.scope["user"].full_name,
                 "user_id": str(self.scope["user"].id),
                 "is_typing": is_typing,
-                "room": self.room_name,
+                "room": self.room_obj.room_name,
             },
         )
 
-    # Receive message from room group (Handler for message)
+    # Receive message from room group (event Handler for message)
     async def chat_message(self, event):
         message = event["message"]
         message_id = event.get("message_id")
-        sender_username = event.get("sender_username", "Unknown")
+        sender_full_name = event.get("sender_full_name", "Unknown")
         sender_id = (
             str(event.get("sender_id", ""))
             if event.get("sender_id") is not None
             else None
         )
-        timestamp = event.get("timestamp", "")
+        sent_at = event.get("timestamp", "")
 
         edited_at = event.get("edited_at")
         is_deleted = event.get("is_deleted")
@@ -191,16 +190,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "type": "chat_message",
                     "message": message,
                     "message_id": message_id,
-                    "sender_username": sender_username,
+                    "sender_full_name": sender_full_name,
                     "sender_id": sender_id,
-                    "timestamp": timestamp,
+                    "timestamp": sent_at,
                     "edited_at": edited_at,
                     "is_deleted": is_deleted,
                 }
             )
         )
 
-    # Handler for typing indicator event (resived from the room group)
+    # event Handler for typing indicator event (resived from the room group)
 
     async def typing_indicator(self, event):
         user = event["user"]
@@ -226,45 +225,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # -- HELPER METHODS FOR DB OPERATIONS --
 
     @database_sync_to_async
-    def get_or_create_room(self, room_name, is_dm_room=False):
-        room = None
-        created = False
+    def get_room(self, room_id):
         try:
-            if is_dm_room:
-                room = ChatRoom.objects.get(room_name=room_name, is_private=True)
-
-            else:
-                room, created = ChatRoom.objects.get_or_create(
-                    room_name=room_name,
-                    defaults={
-                        "creator": self.scope["user"],
-                        "is_private": False,
-                        "description": f"public chat room : {room_name}",
-                    },
-                )
-            if created:
-                print(
-                    f"Created new chat room: {room_name} by {self.scope['user'].username}"
-                )
-
-            return room
-        except Exception as e:
-            print(f"Error getting/creating chat room {room_name}: {e}")
+            return ChatRooms.objects.get(room_id=room_id)
+        except ChatRooms.DoesNotExist:
             return None
 
     @database_sync_to_async
     def is_user_member_of_room(self, room, user):
         if room.is_private:
-            return room.members.filter(id=user.id).exists()
+            return room.members.filter(user_id=user).exists()
         return True  # public rooms are open to all authenictated users
 
     @database_sync_to_async
     def save_chat_message(self, room, sender, content):
         try:
-            created_msg = ChatMessage.objects.create(
-                room=room, sender=sender, content=content
+            created_msg = ChatMessages.objects.create(
+                room=room, sender=sender, content=content, edited_at=datetime.now()
             )
-            print(f"Saved message from {sender.username} to room {room.room_name}")
+            print(f"Saved message from {sender.id} to room {room.room_name}")
             return created_msg
         except Exception as e:
             print(f"Error saving chat message : {e}")
@@ -274,8 +253,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_message_history(self, room, limit=50):
         return list(
-            room.messages.order_by("timestamp").values(
-                "sender__username", "sender__id", "content", "timestamp"
+            room.messages.order_by("sent_at").values(
+                "message_id", "sender__full_name", "sender__id", "content", "sent_at"
             )
         )
 
@@ -288,15 +267,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     {
                         "type": "chat_message",
                         "message": message_data["content"],
-                        "sender_username": message_data["sender__username"],
+                        "message_id": str(message_data["message_id"]),
+                        "sender_full_name": message_data["sender__full_name"],
                         "sender_id": str(message_data["sender__id"]),
-                        "timestamp": message_data["timestamp"].isoformat(),
+                        "timestamp": message_data["sent_at"].isoformat(),
                     }
                 )
             )
 
             print(
-                f"Sent {len(history)} historical messages to : {self.scope['user'].username } in {self.room_obj.room_name}"
+                f"Sent {len(history)} historical messages to : {self.scope['user'].id } in {self.room_obj.room_name}"
             )
 
     # --- Handlers for user join/leave/list events (called by channel layer) ---
@@ -311,7 +291,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     "type": "user_join",
                     "user_id": event["user_id"],
-                    "username": event["username"],
+                    "full_name": event["full_name"],
                 }
             )
         )
@@ -327,7 +307,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     "type": "user_leave",
                     "user_id": event["user_id"],
-                    "username": event["username"],
+                    "user_full_name": event["full_name"],
                 }
             )
         )
@@ -359,7 +339,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "edited_at": event["edited_at"],
                     "room_id": event["room_id"],
                     "sender_id": event["sender_id"],
-                    "sender_username": event["sender_username"],
+                    "sender_full_name": event["sender_full_name"],
                 }
             )
         )
@@ -372,6 +352,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "type": "message_deleted",
                     "message_id": event["message_id"],
                     "room_id": event["room_id"],
+                    "edited_at": event["edited_at"],
                 }
             )
         )
@@ -403,12 +384,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_user_data_for_presence_list(self, user_ids):
-        """Fetches username and ID for a list of user IDs from the database."""
+        """Fetches full name and ID for a list of user IDs from the database."""
         if not user_ids:
             return []
 
-        users = user.objects.filter(id__in=user_ids).values("id", "username")
-        return [{"id": str(user["id"]), "username": user["username"]} for user in users]
+        users = user.objects.filter(id__in=user_ids).values("id", "full_name")
+        return [
+            {"id": str(user["id"]), "full_name": user["full_name"]} for user in users
+        ]
 
     async def send_current_room_users(self):
         """
@@ -422,5 +405,5 @@ class ChatConsumer(AsyncWebsocketConsumer):
             text_data=json.dumps({"type": "room_users_list", "users": users_data})
         )
         print(
-            f"Sent {len(users_data)} current users to {self.scope['user'].username} in {self.room_obj.room_name}"
+            f"Sent {len(users_data)} current users to {self.scope['user'].full_name} in {self.room_obj.room_name}"
         )

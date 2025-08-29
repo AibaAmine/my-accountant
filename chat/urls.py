@@ -46,7 +46,7 @@ urlpatterns = [
     path(
         "chatrooms/<uuid:room_id>/messages/",
         RoomMessageListAPIView.as_view(),
-        name="direct_message_room_messages",
+        name="room_messages",
     ),
     path(
         "chatrooms/<uuid:room_id>/members/",
