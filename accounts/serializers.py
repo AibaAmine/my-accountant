@@ -26,7 +26,7 @@ class CustomRegisterSerializer(RegisterSerializer):
         choices=[
             ("client", "Client"),
             ("accountant", "Accountant"),
-            ("student", "Student"),
+            ("academic", "Academic"),
             ("admin", "Admin"),
         ],
         required=True,

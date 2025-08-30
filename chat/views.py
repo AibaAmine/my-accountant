@@ -315,6 +315,7 @@ class RoomMessageListAPIView(generics.ListAPIView):
         return room.messages.all()
 
 
+
 class ChatMessageUpdateAPIView(generics.UpdateAPIView):
     queryset = ChatMessages.objects.all()
     serializer_class = ChatMessageUpdateSerializer
@@ -403,7 +404,7 @@ def can_users_communicate(user1, user2):
     if role1 == "accountant" or role2 == "accountant":
         return True
 
-    if role1 == "student" and role2 == "student":
+    if role1 == "academic" and role2 == "academic":
         return True
 
     return False
