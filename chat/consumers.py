@@ -25,10 +25,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close(code=4000)  # could not get /create room
             return
 
-        # Dm specific authorization check
-        if self.room_obj.is_private and not await self.is_user_member_of_room(
-            self.room_obj, self.scope["user"]
-        ):
+        if not await self.is_user_member_of_room(self.room_obj, self.scope["user"]):
 
             await self.close(code=4003)  # 4003 :Forbidden access
             return
@@ -64,13 +61,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         # Leave room group
-        if not isinstance(self.scope["user"], AnonymousUser):  # if authorized
+        if not isinstance(self.scope["user"], AnonymousUser) and hasattr(
+            self, "room_obj"
+        ):
+            # if authorized
             await self.channel_layer.group_discard(
                 self.room_group_name, self.channel_name
             )
-            print(
-                f"WebSocket DISCONNECT /ws/chat/{self.room_id}/ [User: {self.scope['user'].id}] Code: {close_code}"
-            )
+
+            await self.update_user_last_seen()
 
             # remove User from Redis presence
             await self.remove_user_from_redis_presence(
@@ -87,6 +86,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "full_name": self.scope["user"].full_name,
                 },
             )
+
+            print(
+                f"WebSocket DISCONNECT /ws/chat/{self.room_id}/ [User: {self.scope['user'].id}] Code: {close_code}"
+            )
+        if close_code == 4000:
+            # Room not found
+            await self.send(text_data=json.dumps({"error": "Room not found"}))
+        elif close_code == 4003:
+            # Forbidden access
+            await self.send(text_data=json.dumps({"error": "Forbidden access"}))
+
+        elif close_code == 4001:
+            # Unauthorized
+            await self.send(text_data=json.dumps({"error": "Unauthorized"}))
 
     # Receive message from WebSocket
     async def receive(self, text_data):
@@ -132,7 +145,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "message": created_msg.content,
                     "sender_id": str(created_msg.sender.id),
                     "sender_full_name": created_msg.sender.full_name,
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": created_msg.sent_at.isoformat(),
                     "edited_at": (
                         created_msg.edited_at.isoformat()
                         if created_msg.edited_at
@@ -233,9 +246,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def is_user_member_of_room(self, room, user):
-        if room.is_private:
-            return room.members.filter(user_id=user).exists()
-        return True  # public rooms are open to all authenictated users
+        # Always check membership regardless of room type
+        return room.members.filter(user_id=user).exists()
 
     @database_sync_to_async
     def save_chat_message(self, room, sender, content):
@@ -253,10 +265,36 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_message_history(self, room, limit=50):
         return list(
-            room.messages.order_by("sent_at").values(
-                "message_id", "sender__full_name", "sender__id", "content", "sent_at"
+            room.messages.order_by("-sent_at").values(
+                "message_id",
+                "sender__full_name",
+                "sender__id",
+                "content",
+                "sent_at",
+                "message_type",
+                "file",
+                "edited_at",
+                "is_deleted",
             )
         )
+
+    @database_sync_to_async
+    def update_user_last_seen(self):
+        """Update the user's last seen timestamp for this room"""
+        from django.utils import timezone
+
+        try:
+
+            last_seen, created = self.room_obj.user_last_seen.get_or_create(
+                user=self.scope["user"], defaults={"last_seen_at": timezone.now()}
+            )
+
+            if not created:
+                last_seen.last_seen_at = timezone.now()
+                last_seen.save()
+
+        except Exception as e:
+            print(f"Error updating last seen: {e}")
 
     # method to send messages history to a room
     async def send_message_history(self):

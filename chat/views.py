@@ -10,13 +10,15 @@ from .serializers import (
     ChatRoomCreateSerializer,
     ChatMessageUpdateSerializer,
     ChatMessageDeleteSerializer,
+    ChatFileUploadSerializer,
 )
-from .models import ChatRooms, ChatMessages, ChatMembers
+from .models import ChatRooms, ChatMessages, ChatMembers, UserRoomLastSeen
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.filters import SearchFilter
+from rest_framework.parsers import MultiPartParser
 from django.http import FileResponse
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -24,6 +26,8 @@ from datetime import datetime
 from django.db import models
 from accounts.models import User
 from accounts.serializers import CustomUserDetailsSerializer
+
+from django.db.models import Prefetch, Count
 
 User = get_user_model()
 
@@ -52,7 +56,9 @@ class AvailableUserListAPIView(generics.ListAPIView):
             return User.objects.all().exclude(id=user.id)
 
         if user.user_type == "academic":
-            return User.objects.filter(user_type="accountant").exclude(id=user.id)
+            return User.objects.filter(
+                user_type__in=["accountant", "academic"]
+            ).exclude(id=user.id)
         return User.objects.none()
 
 
@@ -61,29 +67,37 @@ class GroupChatRoomListAPIView(generics.ListAPIView):
     serializer_class = ChatRoomSerializer
     permission_classes = [IsAuthenticated]
 
+    # add the request obj to the serializer
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
     def get_queryset(self):
         user = self.request.user
 
         return (
-            ChatRooms.objects.filter(
-                members__user_id=user,
-                is_dm=False,
+            ChatRooms.objects.filter(members__user_id=user, is_dm=False)
+            .exclude(room_name__startswith="dm_")
+            .select_related(
+                "creator"
+            )  # Prefetch creator data(we use select_related for foreign key attributs (performing joins))
+            .prefetch_related(
+                # Prefetch user's last seen data for unread messages((we use prefetch_related to fetch for ex room.members...many to many fields...etc))
+                Prefetch(
+                    "user_last_seen",
+                    queryset=UserRoomLastSeen.objects.filter(user=user),
+                    to_attr="prefetched_user_last_seen",
+                )
             )
-            .exclude(room_name__startswith="dm_")  # list only rooms
-            .annotate(  # this finds the most recent message time from any user in that room
-                last_message_time=models.Max("messages__sent_at")
+            .annotate(
+                # Annotate counts to avoid N+1 queries
+                message_count_annotated=Count("messages"),
+                members_count_annotated=Count("members"),
+                last_message_time=models.Max("messages__sent_at"),
             )
             .order_by("-last_message_time")
         )
-
-    def list(self, request, *args, **kwargs):
-        user = self.request.user
-        if not can_access_rooms(user):
-            return Response(
-                {"detail": "You do not have access to chat rooms."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        return super().list(request, *args, **kwargs)
 
 
 # user Direct Message Rooms
@@ -91,14 +105,28 @@ class DirectMessageRoomListAPIView(generics.ListAPIView):
     serializer_class = ChatRoomSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
     def get_queryset(self):
         user = self.request.user
         return (
-            ChatRooms.objects.filter(
-                members__user_id=user,
-                is_dm=True,
+            ChatRooms.objects.filter(members__user_id=user, is_dm=True)
+            .select_related("creator")
+            .prefetch_related(
+                Prefetch(
+                    "user_last_seen",
+                    queryset=UserRoomLastSeen.objects.filter(user=user),
+                    to_attr="prefetched_user_last_seen",
+                )
             )
-            .annotate(last_message_time=models.Max("messages__sent_at"))
+            .annotate(
+                message_count_annotated=Count("messages"),
+                members_count_annotated=Count("members"),
+                last_message_time=models.Max("messages__sent_at"),
+            )
             .order_by("-last_message_time")
         )
 
@@ -122,12 +150,35 @@ class GroupChatRoomCreateAPIView(generics.CreateAPIView):
 
 
 # Chat group Rooms Retrieve, Update, Delete
-class ChatRoomRetrieveUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
+class GroupChatRoomRetrieveUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ChatRooms.objects.all()
     serializer_class = ChatRoomSerializer
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
     lookup_field = "room_id"
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
+    def get_queryset(self):
+        user = self.request.user
+
+        return (
+            ChatRooms.objects.filter(members__user_id=user)
+            .select_related("creator")
+            .prefetch_related(
+                Prefetch(
+                    "user_last_seen",  # This matches your related_name
+                    queryset=UserRoomLastSeen.objects.filter(user=user),
+                    to_attr="prefetched_user_last_seen",
+                )
+            )
+            .annotate(
+                message_count_annotated=Count("messages"),
+                members_count_annotated=Count("members"),
+            )
+        )
 
     def get_object(self):
         obj = super().get_object()
@@ -166,18 +217,17 @@ class ChatRoomAddMemberAPIView(views.APIView):
 
         target_user = get_object_or_404(User, id=target_user_id)
 
-        # Check if the target user can be added
-        if not can_users_communicate(request.user, target_user):
+        if target_user.user_type == "client":
             return Response(
-                {
-                    "detail": "This user cannot be added to the room based on role restrictions."
-                },
+                {"detail": "You cannot add a client to this room."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         if room.members.filter(user_id=target_user).exists():
             return Response(
-                {"detail": f"{target_user.username} is already a member of this room."},
+                {
+                    "detail": f"{target_user.full_name} is already a member of this room."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -216,7 +266,7 @@ class ChatRoomRemoveMemberAPIView(views.APIView):
 
         if not room.members.filter(user_id=target_user).exists():
             return Response(
-                {"detail": f"{target_user.username} is not a member of this room."},
+                {"detail": f"{target_user.full_name} is not a member of this room."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -233,15 +283,14 @@ class DirectMessageRoomAPIView(views.APIView):
     def post(self, request):
 
         current_user = request.user
-
         target_user_id = request.data.get("target_user_id")
 
         target_user = get_object_or_404(User, id=target_user_id)
 
         if current_user.id == target_user.id:
             return Response(
-                "Cannot create or direct message with yourself.",
-                status.HTTP_400_BAD_REQUEST,
+                {"error": "Cannot create or direct message with yourself."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if not can_users_communicate(current_user, target_user):
@@ -250,7 +299,7 @@ class DirectMessageRoomAPIView(views.APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Generate rooom name for direct messages
+        # Generate room name for direct messages
         # we use sorted to ensures that the room name is the same
         user_ids = sorted([str(current_user.id), str(target_user.id)])
 
@@ -285,6 +334,10 @@ class RoomMemberListAPIView(generics.ListAPIView):
 
     serializer_class = CustomUserDetailsSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
+    page_size = 20
+    filter_backends = [SearchFilter]
+    search_fields = ["full_name"]
 
     def get_queryset(self):
         room_id = self.kwargs.get("room_id")
@@ -315,6 +368,17 @@ class RoomMessageListAPIView(generics.ListAPIView):
         return room.messages.all()
 
 
+class RoomMembersCountAPIView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, room_id):
+        room = get_object_or_404(ChatRooms, room_id=room_id)
+
+        if not room.members.filter(user_id=request.user).exists():
+            raise PermissionDenied("You are not a member of this room.")
+
+        return Response({"members_count": room.members.count()})
+
 
 class ChatMessageUpdateAPIView(generics.UpdateAPIView):
     queryset = ChatMessages.objects.all()
@@ -325,7 +389,7 @@ class ChatMessageUpdateAPIView(generics.UpdateAPIView):
     def get_queryset(self):
         user = self.request.user
         return ChatMessages.objects.filter(sender=user, is_deleted=False)
-    
+
     def get_object(self):
         obj = super().get_object()
         if obj.sender != self.request.user:
@@ -365,12 +429,12 @@ class ChatMessageDeleteAPIView(generics.DestroyAPIView):
 
     def get_queryset(self):
         return ChatMessages.objects.filter(sender=self.request.user, is_deleted=False)
-    
+
     def get_object(self):
         obj = super().get_object()
         if obj.sender != self.request.user:
             raise PermissionDenied("You do not have permission to delete this message.")
-        
+
         if not obj or obj.is_deleted:
             raise PermissionDenied("Message not found or already deleted.")
         return obj
@@ -394,7 +458,98 @@ class ChatMessageDeleteAPIView(generics.DestroyAPIView):
         )
 
 
+class ChatFileUploadAPIView(views.APIView):
+    parser_classes = [MultiPartParser]
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def post(self, request, room_id):
+        room = get_object_or_404(ChatRooms, room_id=room_id)
+
+        if not room.members.filter(user_id=request.user).exists():
+            raise PermissionDenied("You are not a member of this room.")
+
+        serializer = ChatFileUploadSerializer(data=request.data)
+
+        if serializer.is_valid():
+            msg = serializer.save(sender=request.user, room=room, message_type="file")
+            # broadcast the file-message to WS group
+            layer = get_channel_layer()
+            async_to_sync(layer.group_send)(
+                f"chat_{room_id}",
+                {
+                    "type": "chat_message",
+                    "message_id": str(msg.message_id),
+                    "message": msg.file.url,
+                    "sender_id": str(request.user.id),
+                    "sender_full_name": request.user.full_name,
+                    "timestamp": msg.sent_at.isoformat(),
+                    "message_type": "file",
+                },
+            )
+            return Response({"file_url": msg.file.url}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MarkRoomAsReadAPIView(views.APIView):
+    """API endpoint to manually update user's last seen timestamp for a room"""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, room_id):
+        room = get_object_or_404(ChatRooms, room_id=room_id)
+
+        # Check if user is a member of the room
+        if not room.members.filter(user_id=request.user).exists():
+            raise PermissionDenied("You are not a member of this room.")
+
+        from django.utils import timezone
+
+        # Update or create last seen record using your related_name
+        last_seen, created = room.user_last_seen.get_or_create(
+            user=request.user, defaults={"last_seen_at": timezone.now()}
+        )
+
+        if not created:
+            last_seen.last_seen_at = timezone.now()
+            last_seen.save()
+
+        return Response(
+            {"message": "Last seen updated successfully"}, status=status.HTTP_200_OK
+        )
+
+
+class UnreadMessageCountAPIView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        unread_count = 0
+
+        # Count unread messages across all rooms
+        user_rooms = ChatRooms.objects.filter(members__user_id=user)
+
+        for room in user_rooms:
+            try:
+                last_seen = room.user_last_seen.get(user=user)
+                unread_count += (
+                    room.messages.filter(
+                        sent_at__gt=last_seen.last_seen_at, is_deleted=False
+                    )
+                    .exclude(sender=user)
+                    .count()
+                )
+            except:
+                unread_count += (
+                    room.messages.filter(is_deleted=False).exclude(sender=user).count()
+                )
+
+        return Response({"unread_count": unread_count})
+
+
 # HELPER FUNCTIONS FOR ROLES CHECKING
+
+
 def can_users_communicate(user1, user2):
     """Check if two users can communicate based on their roles"""
     role1 = user1.user_type

@@ -23,6 +23,7 @@ class User(AbstractUser):
             ("admin", "Admin"),
         ],
         default="client",
+        
     )
     company_name = models.CharField(max_length=255, blank=True)
     job_title = models.CharField(max_length=100, blank=True)

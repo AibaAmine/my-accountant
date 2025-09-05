@@ -67,15 +67,7 @@ class JWTAuthMiddleware(BaseMiddleware):
                     print("Invalid Authorization header format for WebSocket.")
                     pass  # Malformed header, token_key remains None
 
-            # --- 2. If not found in header, try to get from query parameter
-            if not token_key:
-                query_string = scope.get("query_string", b"").decode()
-                parsed_query = parse_qs(query_string)
-                if "token" in parsed_query:
-                    # parse_qs returns a list for each parameter, get the first one
-                    token_key = parsed_query["token"][0]
-                    print("JWT token found in URL query parameter (for testing).")
-
+        
             if token_key:
                 # 3. Authenticate user using the found token
                 scope["user"] = await get_user_from_token(token_key)

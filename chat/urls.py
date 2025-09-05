@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     AvailableUserListAPIView,
-    ChatRoomRetrieveUpdateDeleteAPIView,
+    GroupChatRoomRetrieveUpdateDeleteAPIView,
     GroupChatRoomListAPIView,
     DirectMessageRoomListAPIView,
     DirectMessageRoomAPIView,
@@ -12,6 +12,10 @@ from .views import (
     ChatRoomRemoveMemberAPIView,
     ChatMessageDeleteAPIView,
     ChatMessageUpdateAPIView,
+    ChatFileUploadAPIView,
+    UnreadMessageCountAPIView,
+    RoomMembersCountAPIView,
+    MarkRoomAsReadAPIView,
 )
 
 urlpatterns = [
@@ -30,7 +34,7 @@ urlpatterns = [
     ),
     path(
         "chatrooms/<uuid:room_id>/",
-        ChatRoomRetrieveUpdateDeleteAPIView.as_view(),
+        GroupChatRoomRetrieveUpdateDeleteAPIView.as_view(),
         name="chatroom_detail",
     ),
     path(
@@ -54,12 +58,13 @@ urlpatterns = [
         name="room_member_list",
     ),
     path(
-        "chatrooms/direct/",
+        "chatrooms/direct/me/",
         DirectMessageRoomListAPIView.as_view(),
         name="direct_message_room_list",
     ),
     path(
-        "chatrooms/direct/create/",
+        # getting or fetching direct message room
+        "chatrooms/direct/",
         DirectMessageRoomAPIView.as_view(),
         name="create_direct_message_room",
     ),
@@ -72,5 +77,17 @@ urlpatterns = [
         "chatrooms/messages/<uuid:message_id>/update/",
         ChatMessageUpdateAPIView.as_view(),
         name="update_chat_message",
+    ),
+    path("rooms/<uuid:room_id>/upload_file/", ChatFileUploadAPIView.as_view()),
+    path("unread-count/", UnreadMessageCountAPIView.as_view(), name="unread_count"),
+    path(
+        "rooms/<uuid:room_id>/members/count/",
+        RoomMembersCountAPIView.as_view(),
+        name="room_members_count",
+    ),
+    path(
+        "rooms/<uuid:room_id>/mark-read/",
+        MarkRoomAsReadAPIView.as_view(),
+        name="mark_room_read",
     ),
 ]

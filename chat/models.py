@@ -53,6 +53,24 @@ class ChatMembers(models.Model):
         return f"{self.user_id.username} in {self.room_id.room_name}"
 
 
+class UserRoomLastSeen(models.Model):
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="room_last_seen"
+    )
+    room = models.ForeignKey(
+        ChatRooms, on_delete=models.CASCADE, related_name="user_last_seen"
+    )
+    last_seen_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "user_room_last_seen"
+        unique_together = ("user", "room")
+        verbose_name = "User Room Last Seen"
+        verbose_name_plural = "User Room Last Seen"
+
+    def __str__(self):
+        return f"{self.user.full_name} last seen {self.room.room_name} at {self.last_seen_at}"
+
 class ChatMessages(models.Model):
 
     message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -71,10 +89,13 @@ class ChatMessages(models.Model):
         ],
         default="text",
     )
+
+    file = models.FileField(upload_to="chat_files/", blank=True, null=True)
+
     sent_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
     is_edited = models.BooleanField(default=False)
-    
+
     edited_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -84,3 +105,5 @@ class ChatMessages(models.Model):
 
     def __str__(self):
         return f"Message from {self.sender.id} in {self.room_id.room_name}"
+
+
