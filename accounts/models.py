@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 import uuid
-from cloudinary.models import CloudinaryField
 
 from datetime import timedelta
 from django.utils import timezone
@@ -23,12 +22,7 @@ class User(AbstractUser):
             ("admin", "Admin"),
         ],
         default="client",
-        
     )
-    company_name = models.CharField(max_length=255, blank=True)
-    job_title = models.CharField(max_length=100, blank=True)
-    bio = models.TextField(blank=True)
-    profile_picture_url = CloudinaryField("image", null=True, blank=True)
     is_email_verified = models.BooleanField(default=False)
     account_status = models.CharField(
         max_length=20,

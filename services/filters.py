@@ -20,6 +20,11 @@ class ServiceFilter(django_filters.FilterSet):
         choices=Service.LOCATION_CHOICES, field_name="location_preference"
     )
 
+    # Geographic location filter
+    location = django_filters.MultipleChoiceFilter(
+        choices=Service.WILAYA_CHOICES, field_name="location"
+    )
+
     # Experience level filters
     experience_level_required = django_filters.MultipleChoiceFilter(
         choices=Service.EXPERIENCE_LEVEL_CHOICES, field_name="experience_level_required"
@@ -66,6 +71,7 @@ class ServiceFilter(django_filters.FilterSet):
             "search",
             "category",
             "location_preference",
+            "location",
             "experience_level_required",
             "urgency_level",
             "min_price",
@@ -79,16 +85,18 @@ class ServiceFilter(django_filters.FilterSet):
             "created_before",
         ]
 
+    # add profile search
+
     def filter_search(self, queryset, name, value):
         """Search across multiple fields in services"""
         if value:
+
             return queryset.filter(
                 Q(title__icontains=value)
                 | Q(description__icontains=value)
                 | Q(skills_keywords__icontains=value)
                 | Q(requirements_notes__icontains=value)
                 | Q(user__full_name__icontains=value)
-                | Q(user__company_name__icontains=value)
+                | Q(location__icontains=value)
                 | Q(category__name__icontains=value)
             )
-        return queryset

@@ -20,7 +20,8 @@ class ServiceCategory(models.Model):
     def __str__(self):
         return self.name
 
-#add location field
+
+# add location field
 class Service(models.Model):
 
     SERVICE_TYPE_CHOICES = [
@@ -56,7 +57,67 @@ class Service(models.Model):
         ("high", "High Priority"),
         ("urgent", "Urgent"),
     ]
-    
+
+    WILAYA_CHOICES = [
+        ("01", "Adrar"),
+        ("02", "Chlef"),
+        ("03", "Laghouat"),
+        ("04", "Oum El Bouaghi"),
+        ("05", "Batna"),
+        ("06", "Béjaïa"),
+        ("07", "Biskra"),
+        ("08", "Béchar"),
+        ("09", "Blida"),
+        ("10", "Bouira"),
+        ("11", "Tamanrasset"),
+        ("12", "Tébessa"),
+        ("13", "Tlemcen"),
+        ("14", "Tiaret"),
+        ("15", "Tizi Ouzou"),
+        ("16", "Algiers"),
+        ("17", "Djelfa"),
+        ("18", "Jijel"),
+        ("19", "Sétif"),
+        ("20", "Saïda"),
+        ("21", "Skikda"),
+        ("22", "Sidi Bel Abbès"),
+        ("23", "Annaba"),
+        ("24", "Guelma"),
+        ("25", "Constantine"),
+        ("26", "Médéa"),
+        ("27", "Mostaganem"),
+        ("28", "M'Sila"),
+        ("29", "Mascara"),
+        ("30", "Ouargla"),
+        ("31", "Oran"),
+        ("32", "El Bayadh"),
+        ("33", "Illizi"),
+        ("34", "Bordj Bou Arréridj"),
+        ("35", "Boumerdès"),
+        ("36", "El Tarf"),
+        ("37", "Tindouf"),
+        ("38", "Tissemsilt"),
+        ("39", "El Oued"),
+        ("40", "Khenchela"),
+        ("41", "Souk Ahras"),
+        ("42", "Tipaza"),
+        ("43", "Mila"),
+        ("44", "Aïn Defla"),
+        ("45", "Naâma"),
+        ("46", "Aïn Témouchent"),
+        ("47", "Ghardaïa"),
+        ("48", "Relizane"),
+        ("49", "El M'Ghair"),
+        ("50", "El Meniaa"),
+        ("51", "Ouled Djellal"),
+        ("52", "Bordj Badji Mokhtar"),
+        ("53", "Béni Abbès"),
+        ("54", "Timimoun"),
+        ("55", "Touggourt"),
+        ("56", "Djanet"),
+        ("57", "In Salah"),
+        ("58", "In Guezzam"),
+    ]
 
     # Primary fields
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -93,6 +154,13 @@ class Service(models.Model):
     )
     location_preference = models.CharField(
         max_length=50, choices=LOCATION_CHOICES, default="online"
+    )
+    location = models.CharField(
+        max_length=3,
+        choices=WILAYA_CHOICES,
+        blank=True,
+        null=True,
+        help_text="Select the wilaya (province)",
     )
 
     # Additional details

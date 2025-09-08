@@ -685,7 +685,9 @@ When an accountant creates a service, they're advertising their professional ser
   "skills_keywords": "CPA, tax filing, small business, QuickBooks, depreciation",
   "urgency_level": "any",
   "location_preference": "online",
-  "requirements_notes": "Client must provide all necessary documents (receipts, income statements, etc.) before service begins"
+  "requirements_notes": "Client must provide all necessary documents (receipts, income statements, etc.) before service begins",
+  
+  "location"
 }
 ```
 

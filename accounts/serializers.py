@@ -18,6 +18,38 @@ class CustomLoginSerializer(LoginSerializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(style={"input_type": "password"})
 
+    def validate(self, attrs):
+        email = attrs.get("email")
+        password = attrs.get("password")
+
+        if email and password:
+            # Check if user exists with this email
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"email": "No user found with this email address."}
+                )
+
+            # Check if password is correct
+            if not user.check_password(password):
+                raise serializers.ValidationError({"password": "Incorrect password."})
+
+            # Check if user is active
+            if not user.is_active:
+                raise serializers.ValidationError(
+                    {"email": "This account is not activated."}
+                )
+
+            user.backend = "django.contrib.auth.backends.ModelBackend"
+
+            attrs["user"] = user
+        else:
+            msg = 'Must include "email" and "password".'
+            raise serializers.ValidationError(msg, code="authorization")
+
+        return attrs
+
 
 class CustomRegisterSerializer(RegisterSerializer):
     username = None  # Remove username field completely
@@ -73,10 +105,7 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
 
     user_type = serializers.CharField(read_only=True)
     full_name = serializers.CharField()
-    company_name = serializers.CharField()
-    job_title = serializers.CharField()
     phone = serializers.CharField()
-    bio = serializers.CharField()
     is_email_verified = serializers.BooleanField(read_only=True)
     account_status = serializers.CharField(read_only=True)
 
@@ -87,11 +116,7 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
             "email",
             "full_name",
             "user_type",
-            "company_name",
-            "job_title",
             "phone",
-            "bio",
-            "profile_picture_url",
             "is_email_verified",
             "account_status",
             "created_at",
@@ -106,16 +131,6 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
             "is_email_verified",
             "account_status",
         )
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        if instance.profile_picture_url:
-            data["profile_picture_url"] = (
-                f"https://res.cloudinary.com/{settings.CLOUDINARY_STORAGE['CLOUD_NAME']}/image/upload/{instance.profile_picture_url}"
-            )
-        else:
-            data["profile_picture_url"] = None
-        return data
 
 
 # for Generates & sends OTP

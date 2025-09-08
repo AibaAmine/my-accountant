@@ -47,15 +47,12 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_filters",
     "drf_yasg",
-    "cloudinary",
-    "cloudinary_storage",
     "accounts.apps.AccountsConfig",
     "profiles",
     "services",
     "bookings",
     "chat",
     "learning",
-    # custom adapters
 ]
 # Use custom adapter to populate full_name on social login
 SOCIALACCOUNT_ADAPTER = "accounts.adapters.CustomSocialAccountAdapter"
@@ -331,15 +328,4 @@ SWAGGER_SETTINGS = {
     "DEFAULT_INFO": "my_accountant_project.urls.schema_view",
     "USE_SESSION_AUTH": False,
     "DOC_EXPANSION": "none",
-}
-
-# Cloudinary Configuration
-CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
-CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
-CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
-
-CLOUDINARY_STORAGE = {
-    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME"),
-    "API_KEY": os.getenv("CLOUDINARY_API_KEY"),
-    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET"),
 }
