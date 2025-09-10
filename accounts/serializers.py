@@ -91,16 +91,25 @@ class CustomRegisterSerializer(RegisterSerializer):
         return data
 
     def save(self, request):
-        user = super().save(request)
-        user.full_name = self.validated_data.get("full_name", "")
-        user.user_type = self.validated_data.get("user_type")
-        user.phone = self.validated_data.get("phone")
-        user.is_active = False  # Require OTP verification before activation
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        user = User(
+            email=self.validated_data["email"],
+            full_name=self.validated_data.get("full_name", ""),
+            user_type=self.validated_data.get("user_type"),
+            phone=self.validated_data.get("phone", ""),
+            is_active=False,  # Require OTP verification before activation
+        )
+
+        user.set_password(self.validated_data["password1"])
+
         user.save()
+
         return user
 
 
-# used for updating users info api
 class CustomUserDetailsSerializer(UserDetailsSerializer):
 
     user_type = serializers.CharField(read_only=True)
