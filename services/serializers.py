@@ -2,17 +2,11 @@ from rest_framework import serializers
 from .models import Service, ServiceCategory
 from accounts.serializers import CustomUserDetailsSerializer
 from django.utils import timezone
-
-
-class ServiceCategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ServiceCategory
-        fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at")
+from .category_serializers import ServiceCategorySerializer
 
 
 class ServiceListSerializer(serializers.ModelSerializer):
-    category = ServiceCategorySerializer(read_only=True)
+    categories = ServiceCategorySerializer(many=True, read_only=True)
     user = CustomUserDetailsSerializer(read_only=True)
 
     class Meta:
@@ -23,12 +17,11 @@ class ServiceListSerializer(serializers.ModelSerializer):
             "service_type",
             "title",
             "description",
-            "category",
+            "categories",
             "price",
-            "price_negotiable",
-            "location_preference",
             "location",
-            "urgency_level",
+            "location_description",
+            "delivery_method",
             "is_featured",
             "created_at",
         ]
@@ -37,7 +30,7 @@ class ServiceListSerializer(serializers.ModelSerializer):
 
 class ServiceDetailSerializer(serializers.ModelSerializer):
     user = CustomUserDetailsSerializer(read_only=True)
-    category = ServiceCategorySerializer(read_only=True)
+    categories = ServiceCategorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Service
@@ -45,7 +38,11 @@ class ServiceDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "user", "created_at", "updated_at", "service_type")
 
 
-class ServiceCreateSerializer(serializers.ModelSerializer):
+class AccountantServiceDetailSerializer(serializers.ModelSerializer):
+    """Serializer for accountants viewing service details (their offered services or client requests)"""
+
+    user = CustomUserDetailsSerializer(read_only=True)
+    categories = ServiceCategorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Service
@@ -55,31 +52,139 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             "service_type",
             "title",
             "description",
-            "category",  # for existing category selection
+            "categories",
             "price",
-            "price_negotiable",
+            "price_description",
             "estimated_duration",
             "duration_unit",
-            "deadline",
-            "experience_level_required",
-            "skills_keywords",
-            "urgency_level",
-            "location_preference",
+            "estimated_duration_description",
             "location",
-            "requirements_notes",
+            "delivery_method",
+            "attachments",
+            "is_active",
+            "is_featured",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ("id", "user", "created_at", "updated_at", "service_type")
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+
+        # Handle attachments display
+        if instance.attachments:
+            representation["attachments"] = {
+                "url": instance.attachments.url,
+                "filename": (
+                    instance.attachments.name.split("/")[-1]
+                    if instance.attachments.name
+                    else "file"
+                ),
+            }
+        else:
+            representation["attachments"] = None
+
+        return representation
+
+
+class ClientServiceDetailSerializer(serializers.ModelSerializer):
+    """Serializer for clients viewing service details (their requests or accountant offers)"""
+
+    user = CustomUserDetailsSerializer(read_only=True)
+    categories = ServiceCategorySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Service
+        fields = [
+            "id",
+            "user",
+            "service_type",
+            "title",
+            "description",
+            "categories",
+            "tasks_and_responsibilities",
+            "conditions_requirements",
+            "estimated_duration",
+            "duration_unit",
+            "estimated_duration_description",
+            "price",
+            "price_description",
+            "location",
+            "delivery_method",
+            "attachments",
+            "is_active",
+            "is_featured",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ("id", "user", "created_at", "updated_at", "service_type")
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+
+        # Handle attachments display
+        if instance.attachments:
+            representation["attachments"] = {
+                "url": instance.attachments.url,
+                "filename": (
+                    instance.attachments.name.split("/")[-1]
+                    if instance.attachments.name
+                    else "file"
+                ),
+            }
+        else:
+            representation["attachments"] = None
+
+        return representation
+
+
+class ServiceCreateSerializer(serializers.ModelSerializer):
+    categories = serializers.ListField(
+        child=serializers.UUIDField(), write_only=True, required=True
+    )
+
+    class Meta:
+        model = Service
+        fields = [
+            "id",
+            "user",
+            "service_type",
+            "title",
+            "description",
+            "categories",  # list of existing category IDs
+            "price",
+            "price_description",
+            "estimated_duration",
+            "duration_unit",
+            "estimated_duration_description",
+            "tasks_and_responsibilities",
+            "conditions_requirements",
+            "location",
+            "location_description",
+            "delivery_method",
             "attachments",
             "created_at",
         ]
         read_only_fields = ("id", "created_at", "user", "service_type", "updated_at")
 
-        extra_kwargs = {"category": {"required": True}}
+    def validate_categories(self, value):
+        """Validate that all provided category IDs exist and are active"""
+        if not value:
+            raise serializers.ValidationError("At least one category must be selected.")
+
+        existing_categories = ServiceCategory.objects.filter(
+            id__in=value, is_active=True
+        )
+        if len(existing_categories) != len(value):
+            raise serializers.ValidationError(
+                "One or more selected categories are invalid or inactive."
+            )
+        return value
 
     def validate(self, data):
         user = self.context["request"].user
 
-        if not data.get("category"):
-            raise serializers.ValidationError("Please select an existing category")
-
+        # Set service_type based on user type
         if user.user_type.lower() == "client":
             data["service_type"] = "needed"
         elif user.user_type.lower() == "accountant":
@@ -98,7 +203,17 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        return super().create(validated_data)
+        categories = validated_data.pop("categories", [])
+
+        # Create the service first
+        service = super().create(validated_data)
+
+        # Add the categories
+        if categories:
+            existing_categories = ServiceCategory.objects.filter(id__in=categories)
+            service.categories.add(*existing_categories)
+
+        return service
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -115,15 +230,20 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         else:
             representation["attachments"] = None
 
-        # Include the full category object in response
-        if instance.category:
-            representation["category"] = ServiceCategorySerializer(
-                instance.category
+        # Include the full categories objects in response
+        if instance.categories.exists():
+            representation["categories"] = ServiceCategorySerializer(
+                instance.categories.all(), many=True
             ).data
+        else:
+            representation["categories"] = []
         return representation
 
 
 class ServiceUpdateSerializer(serializers.ModelSerializer):
+    categories = serializers.ListField(
+        child=serializers.UUIDField(), write_only=True, required=False
+    )
 
     class Meta:
         model = Service
@@ -133,21 +253,32 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
             "service_type",
             "title",
             "description",
-            "category",
+            "categories",
             "price",
-            "price_negotiable",
+            "price_description",
             "estimated_duration",
             "duration_unit",
-            "deadline",
-            "experience_level_required",
-            "skills_keywords",
-            "urgency_level",
-            "location_preference",
+            "estimated_duration_description",
+            "tasks_and_responsibilities",
+            "conditions_requirements",
             "location",
-            "requirements_notes",
+            "location_description",
+            "delivery_method",
             "attachments",
         ]
         read_only_fields = ("id", "user", "service_type", "created_at", "updated_at")
+
+    def validate_categories(self, value):
+        """Validate that all provided category IDs exist and are active"""
+        if value:  # Only validate if categories are provided
+            existing_categories = ServiceCategory.objects.filter(
+                id__in=value, is_active=True
+            )
+            if len(existing_categories) != len(value):
+                raise serializers.ValidationError(
+                    "One or more selected categories are invalid or inactive."
+                )
+        return value
 
     def validate(self, data):
         user = self.context["request"].user
@@ -172,25 +303,31 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
         ):
             raise serializers.ValidationError("Duration must be greater than zero.")
 
-        if "deadline" in data and data["deadline"]:
-
-            if data["deadline"] < timezone.now().date():
-                raise serializers.ValidationError("Deadline cannot be in the past.")
-
-        if "category" in data and data["category"]:
-            if not data["category"].is_active:
-                raise serializers.ValidationError("Selected category is not active.")
-
         return data
+
+    def update(self, instance, validated_data):
+        categories = validated_data.pop("categories", None)
+
+        # Update the service first
+        service = super().update(instance, validated_data)
+
+        # Handle categories update if provided
+        if categories is not None:
+            # Clear existing categories and add new ones
+            service.categories.clear()
+            if categories:
+                existing_categories = ServiceCategory.objects.filter(id__in=categories)
+                service.categories.add(*existing_categories)
+
+        return service
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        # Include the full category object in response
-        if instance.category:
-            representation["category"] = ServiceCategorySerializer(
-                instance.category
+        # Include the full categories objects in response
+        if instance.categories.exists():
+            representation["categories"] = ServiceCategorySerializer(
+                instance.categories.all(), many=True
             ).data
+        else:
+            representation["categories"] = []
         return representation
-
-    def update(self, instance, validated_data):
-        return super().update(instance, validated_data)

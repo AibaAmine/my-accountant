@@ -6,8 +6,14 @@ from accounts.models import User
 class ServiceCategory(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, unique=True, blank=False, null=False)
-    description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_categories",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -21,7 +27,6 @@ class ServiceCategory(models.Model):
         return self.name
 
 
-# add location field
 class Service(models.Model):
 
     SERVICE_TYPE_CHOICES = [
@@ -36,26 +41,9 @@ class Service(models.Model):
         ("months", "Months"),
     ]
 
-    LOCATION_CHOICES = [
+    DELIVERY_METHOD_CHOICES = [
         ("online", "Online"),
-        ("client_office", "Client's Office"),
-        ("my_office", "My Office"),
-        ("flexible", "Flexible"),
-        ("to_be_discussed", "To Be Discussed"),
-    ]
-
-    EXPERIENCE_LEVEL_CHOICES = [
-        ("beginner", "Beginner"),
-        ("intermediate", "Intermediate"),
-        ("expert", "Expert"),
-        ("any", "Any Level"),
-    ]
-
-    URGENCY_CHOICES = [
-        ("low", "Low Priority"),
-        ("medium", "Medium Priority"),
-        ("high", "High Priority"),
-        ("urgent", "Urgent"),
+        ("in_person", "In Person"),
     ]
 
     WILAYA_CHOICES = [
@@ -127,44 +115,53 @@ class Service(models.Model):
     # Core content
     title = models.CharField(max_length=255)
     description = models.TextField()
-    category = models.ForeignKey(
-        ServiceCategory, on_delete=models.CASCADE, related_name="services"
+    categories = models.ManyToManyField(
+        ServiceCategory, related_name="services", blank=False
     )
 
     # Pricing
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    price_negotiable = models.BooleanField(default=False)
+
+    price_description = models.TextField(
+        blank=True, help_text="Additional details about pricing"
+    )
 
     # Timeline
     estimated_duration = models.PositiveIntegerField(default=1)
     duration_unit = models.CharField(
         max_length=20, choices=DURATION_CHOICES, default="days"
     )
-    deadline = models.DateField(null=True, blank=True)
+    estimated_duration_description = models.TextField(
+        blank=True,
+    )
 
-    # Requirements/Skills (for both offers and services)
-    experience_level_required = models.CharField(
-        max_length=20, choices=EXPERIENCE_LEVEL_CHOICES, default="any"
+    tasks_and_responsibilities = models.JSONField(
+        default=list,
+        blank=True,
     )
-    skills_keywords = models.TextField(blank=True, help_text="Comma-separated skills")
 
-    # Project specifics
-    urgency_level = models.CharField(
-        max_length=20, choices=URGENCY_CHOICES, default="medium"
-    )
-    location_preference = models.CharField(
-        max_length=50, choices=LOCATION_CHOICES, default="online"
-    )
+    conditions_requirements = models.JSONField(default=list, blank=True)
+
     location = models.CharField(
         max_length=3,
         choices=WILAYA_CHOICES,
         blank=True,
         null=True,
-        help_text="Select the wilaya (province)",
+    )
+
+    location_description = models.TextField(
+        blank=True,
+    )
+
+    # Delivery method
+    delivery_method = models.CharField(
+        max_length=20,
+        choices=DELIVERY_METHOD_CHOICES,
+        default="online",
+        help_text="How the service will be delivered",
     )
 
     # Additional details
-    requirements_notes = models.TextField(blank=True)
     attachments = models.FileField(
         upload_to="service_attachments/", null=True, blank=True
     )
@@ -183,10 +180,13 @@ class Service(models.Model):
         indexes = [
             models.Index(fields=["service_type", "is_active"]),
             models.Index(fields=["user", "service_type"]),
-            models.Index(fields=["category", "service_type"]),
         ]
 
     def __str__(self):
         return (
             f"{self.get_service_type_display()}: {self.title} by {self.user.full_name}"
         )
+
+    def get_categories_display(self):
+        """Return comma-separated list of category names"""
+        return ", ".join([cat.name for cat in self.categories.all()])

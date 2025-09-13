@@ -12,12 +12,17 @@ from .views import (
 from django.urls import path
 
 urlpatterns = [
-    path("categories/", ServiceCategoryListAPIView.as_view(), name="category-list"),
+    # Category endpoints
+    path(
+        "categories/", ServiceCategoryListAPIView.as_view(), name="category-list"
+    ),  # Default categories 
+    
     path(
         "categories/<uuid:pk>/",
         ServiceCategoryDetailAPIView.as_view(),
         name="category-detail",
     ),
+    # Service endpoints
     path("my/", UserServiceListAPIView.as_view(), name="service-list"),
     path("my/<uuid:pk>/", ServiceDetailAPIView.as_view(), name="service-detail"),
     path("create/", ServiceCreateAPIView.as_view(), name="service-create"),

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This documentation covers all APIs for the My Accountant platform, including authentication, user management, services, bookings, and learning features. The platform uses JWT (JSON Web Tokens) for authentication and supports email-based registration with OTP verification, social login (Google/Facebook), password reset, user profile management, service marketplace, booking system, and educational content.
+This documentation covers all APIs for the My Accountant platform, including authentication, user management, services, and bookings. The platform uses JWT (JSON Web Tokens) for authentication and supports email-based registration with OTP verification, social login (Google/Facebook), password reset, user profile management, service marketplace, and booking system.
 
 ## Base URL
 
@@ -330,51 +330,6 @@ https://my-accountant-j02f.onrender.com
 
 ---
 
-### 7. User Profile Management
-
-#### Get User Details 🔒
-
-**Endpoint:** `GET /auth/user/`
-
-**Headers:** `Authorization: Bearer <access_token>`
-
-**Response (Success - 200):**
-
-```json
-{
-  "pk": "uuid-here",
-  "email": "user@example.com",
-  "full_name": "John Doe",
-  "user_type": "client",
-  "company_name": "ABC Corp",
-  "job_title": "Manager",
-  "phone": "+1234567890",
-  "bio": "Experienced professional...",
-  "profile_picture_url": "https://example.com/profile.jpg",
-  "is_email_verified": true,
-  "account_status": "active",
-  "created_at": "2025-01-01T12:00:00Z",
-  "updated_at": "2025-01-01T12:00:00Z"
-}
-```
-
-#### Update User Details 🔒
-
-**Endpoint:** `PUT/PATCH /auth/user/`
-
-**Headers:** `Authorization: Bearer <access_token>`
-
-**Request Body (PATCH example):**
-
-```json
-{
-  "full_name": "John Smith",
-  "company_name": "XYZ Corp",
-  "job_title": "Senior Manager",
-  "bio": "Updated bio..."
-}
-```
-
 **Response (Success - 200):** Updated user object
 
 #### Logout 🔒
@@ -516,7 +471,12 @@ https://my-accountant-j02f.onrender.com
 
 ---
 
-## Services Management
+## 9. Services Management
+
+The Services Management system allows clients to post service requests and accountants to offer their services. The system is role-based where:
+
+- **Clients** create "needed" services (service requests)
+- **Accountants** create "offered" services (service offerings)
 
 ### 1. Service Categories
 
@@ -526,7 +486,7 @@ https://my-accountant-j02f.onrender.com
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Retrieves a list of all active service categories. Use this endpoint to populate your category dropdown/selection list. When the user selects a category, use the `id` field as the category value when creating services.
+**Description:** Retrieves a list of all active predefined service categories for dropdown/selection lists. These categories are managed by administrators and users cannot create custom categories.
 
 **Response (Success - 200):**
 
@@ -535,7 +495,6 @@ https://my-accountant-j02f.onrender.com
   {
     "id": "uuid-here",
     "name": "Tax Preparation",
-    "description": "Tax filing and preparation services",
     "is_active": true,
     "created_at": "2025-01-01T12:00:00Z",
     "updated_at": "2025-01-01T12:00:00Z"
@@ -543,15 +502,6 @@ https://my-accountant-j02f.onrender.com
   {
     "id": "uuid-here",
     "name": "Bookkeeping",
-    "description": "Record keeping and bookkeeping services",
-    "is_active": true,
-    "created_at": "2025-01-01T12:00:00Z",
-    "updated_at": "2025-01-01T12:00:00Z"
-  },
-  {
-    "id": "uuid-here",
-    "name": "Accounting Consulting",
-    "description": "Professional accounting consultation",
     "is_active": true,
     "created_at": "2025-01-01T12:00:00Z",
     "updated_at": "2025-01-01T12:00:00Z"
@@ -559,30 +509,13 @@ https://my-accountant-j02f.onrender.com
 ]
 ```
 
-**Pre-populated Categories:**
-
-- **Tax Preparation** - Tax filing and preparation services
-- **Bookkeeping** - Record keeping and bookkeeping services
-- **Accounting Consulting** - Professional accounting consultation
-- **Financial Reporting** - Financial statements and reporting
-- **Corporate Finance** - Corporate financial services
-- **Budget Preparation** - Budget planning and preparation
-- **Auditing and Financial Review** - Audit and financial review services
-- **Inventory and Cost Management** - Inventory tracking and cost analysis
-- **Loan File Preparation** - Loan documentation and file preparation
-- **Accounting Training Courses** - Professional accounting training and education
-- **Legal Studies** - Legal consultation and studies
-- **Digital and Legal Representation** - Digital services and legal representation
-
-- **Custom Services** - Customized services as per client requirements
-
 #### Get Category Details 🔒
 
 **Endpoint:** `GET /services/categories/{category_id}/`
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Get detailed information about a specific category. Useful for validation and displaying category details.
+**Description:** Get detailed information about a specific category.
 
 **Response (Success - 200):**
 
@@ -590,18 +523,9 @@ https://my-accountant-j02f.onrender.com
 {
   "id": "uuid-here",
   "name": "Tax Preparation",
-  "description": "Tax filing and preparation services",
   "is_active": true,
   "created_at": "2025-01-01T12:00:00Z",
   "updated_at": "2025-01-01T12:00:00Z"
-}
-```
-
-**Response (Error - 404):**
-
-```json
-{
-  "detail": "Not found."
 }
 ```
 
@@ -614,170 +538,64 @@ https://my-accountant-j02f.onrender.com
 **Headers:**
 
 ```
-
 Authorization: Bearer <access_token>
 Content-Type: multipart/form-data
-
 ```
 
-**Description:** Creates a new service with role-specific behavior and fields:
+**Description:** Creates a new service. The service type is automatically determined based on user role:
 
-**Getting Category UUIDs:**
+- **Clients** create `service_type: "needed"` (service requests)
+- **Accountants** create `service_type: "offered"` (service offerings)
 
-Before creating a service, follow this easy workflow:
+**Request Body (Form Data):**
 
-1. **Get categories for dropdown**: Call `GET /services/categories/?format=simple`
-2. **User selects category**: From the dropdown/list populated with the response
-3. **Use selected category ID**: Use the `id` field from the selected category as the `category` value in service creation
-4. **Alternative**: Create a new category by providing `new_category_name` (and optionally `new_category_description`) instead of `category`
-
-**Role-Based Service Creation:**
-
-- **Clients**: Create "needed" services (requesting accounting help)
-  - Focus on what help they need
-  - Describe their requirements and problems
-  - Set budget they're willing to pay
-- **Accountants**: Create "offered" services (providing accounting services)
-  - Focus on what services they provide
-  - Describe their expertise and solutions
-  - Set price for their services
-
-### Client Service Creation Example (service_type: "needed")
-
-When a client creates a service, they're essentially posting a job request for accounting help.
-
-**Request Body for Clients:**
+**Example for Accountants (Offering Services):**
 
 ```json
 {
-  "title": "Need Tax Filing Help for Small Business",
-  "description": "I run a small software company and need help with annual tax filing. I'm having trouble with depreciation calculations and business expense categories.",
-  "category": "uuid-of-tax-category",
-  "price": 500.0,
-  "price_negotiable": true,
-  "estimated_duration": 5,
+  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
+  "description": "أوفر خدمة إعداد وتقديم التصريحات الجبائية الشهرية للشركات والتجار بما في ذلك:\n• تصريح الضريبة على الدخل الإجمالي (IRG)\n• الضريبة على القيمة المضافة (TVA)\n• الضريبة على أرباح الشركات (IBS)\nأقوم بتحليل الوثائق، حساب القيم المستحقة، وملء التصاريح وفقاً للقوانين الجبائية الجزائرية.",
+  "categories": ["uuid1", "uuid2"],
+  "location": "16",
+  "estimated_duration": 2,
   "duration_unit": "days",
-  "deadline": "2025-03-15",
-  "experience_level_required": "intermediate",
-  "skills_keywords": "tax filing, small business, depreciation, business expenses",
-  "urgency_level": "high",
-  "location_preference": "online",
-  "requirements_notes": "Must be familiar with software company taxation and have experience with QuickBooks"
+  "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "price": 8000,
+  "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
+  "delivery_method": "online",
+  "attachments": "tax_declaration_sample.pdf"
 }
 ```
 
-### Accountant Service Creation Example (service_type: "offered")
-
-When an accountant creates a service, they're advertising their professional services.
-
-**Request Body for Accountants:**
+**Example for Clients (Requesting Services):**
 
 ```json
 {
-  "title": "Professional Tax Filing Service for Small Businesses",
-  "description": "I provide comprehensive tax filing services for small businesses. Specialized in tech companies, e-commerce, and service-based businesses. 10+ years experience.",
-  "category": "uuid-of-tax-category",
-  "price": 400.0,
-  "price_negotiable": false,
-  "estimated_duration": 3,
-  "duration_unit": "days",
-  "experience_level_required": "expert",
-  "skills_keywords": "CPA, tax filing, small business, QuickBooks, depreciation",
-  "urgency_level": "any",
-  "location_preference": "online",
-  "requirements_notes": "Client must provide all necessary documents (receipts, income statements, etc.) before service begins",
-  
-  "location"
+  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
+  "description": "نحن شركة توزيع مواد غذائية مقرها في ولاية وهران نبحث عن محاسب معتمد للقيام بإعداد وتقديم التصريحات الجبائية الخاصة بنا (IRG, TVA, IBS) بشكل دوري",
+  "categories": ["uuid1"],
+  "location": "31",
+  "tasks_and_responsibilities": [
+    "جمع وتحليل الوثائق المالية",
+    "إعداد التصريحات الضريبية"
+  ],
+  "conditions_requirements": [
+    "محاسب معتمد أو خبير محاسبي",
+    "الالتزام بالسرية والحذر المهني"
+  ],
+  "estimated_duration": 1,
+  "duration_unit": "weeks",
+  "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "price": 8000,
+  "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
+  "delivery_method": "online",
+  "attachments": "company_documents.pdf"
 }
 ```
 
-### Field Behavior by Role
+**Response (Success - 201):**
 
-**Key Field Differences:**
-
-| Field                       | Client Perspective                 | Accountant Perspective        |
-| --------------------------- | ---------------------------------- | ----------------------------- |
-| `title`                     | What help they need                | Service they offer            |
-| `description`               | Problem description & requirements | Service details & expertise   |
-| `price`                     | Budget they're willing to pay      | Price they charge             |
-| `requirements_notes`        | What they expect from accountant   | What they require from client |
-| `experience_level_required` | Level of accountant they need      | Their own expertise level     |
-| `deadline`                  | When they need it done             | Usually not set (flexible)    |
-| `urgency_level`             | How urgent their need is           | Usually "any" (flexible)      |
-
-### File Attachments Support
-
-Both clients and accountants can include file attachments with their services using multipart/form-data.
-
-**Alternative - Create with New Category :**
-
-```json
-{
-  "title": "Tax Filing for Small Business",
-  "description": "Need help with annual tax filing...",
-  "new_category_name": "Tax Preparation",
-  "new_category_description": "Services related to tax preparation and filing",
-  "price": 500.0,
-  "price_negotiable": true,
-  "estimated_duration": 5,
-  "duration_unit": "days",
-  "deadline": "2025-03-15",
-  "experience_level_required": "intermediate",
-  "skills_keywords": "tax filing, small business, QuickBooks",
-  "urgency_level": "medium",
-  "location_preference": "online",
-  "requirements_notes": "Must be familiar with software company taxation"
-}
-```
-
-**Field Options:**
-
-- **duration_unit**: `hours`, `days`, `weeks`, `months`
-- **experience_level_required**: `beginner`, `intermediate`, `expert`, `any`
-- **urgency_level**: `low`, `medium`, `high`, `urgent`
-- **location_preference**: `online`, `client_office`, `my_office`, `flexible`, `to_be_discussed`
-
-**Response (Success - 201) - Client Example:**
-
-```json
-{
-  "id": "uuid-here",
-  "user": {
-    "pk": "uuid-here",
-    "email": "client@example.com",
-    "full_name": "John Doe",
-    "user_type": "client"
-  },
-  "service_type": "needed",
-  "title": "Need Tax Filing Help for Small Business",
-  "description": "I run a small software company and need help with annual tax filing...",
-  "category": {
-    "id": "uuid-here",
-    "name": "Tax Preparation",
-    "description": "Services related to tax preparation and filing",
-    "is_active": true,
-    "created_at": "2025-01-01T12:00:00Z",
-    "updated_at": "2025-01-01T12:00:00Z"
-  },
-  "price": "500.00",
-  "price_negotiable": true,
-  "estimated_duration": 5,
-  "duration_unit": "days",
-  "deadline": "2025-03-15",
-  "experience_level_required": "intermediate",
-  "skills_keywords": "tax filing, small business, depreciation, business expenses",
-  "urgency_level": "high",
-  "location_preference": "online",
-  "requirements_notes": "Must be familiar with software company taxation and have experience with QuickBooks",
-  "attachments": {
-    "url": "https://example.com/file.pdf",
-    "filename": "tax_documents.pdf"
-  },
-  "created_at": "2025-01-01T12:00:00Z"
-}
-```
-
-**Response (Success - 201) - Accountant Example:**
+**Accountant Service Example:**
 
 ```json
 {
@@ -785,44 +603,81 @@ Both clients and accountants can include file attachments with their services us
   "user": {
     "pk": "uuid-here",
     "email": "accountant@example.com",
-    "full_name": "Jane Smith",
+    "full_name": "الأستاذ عبد القادر بن يوسف",
     "user_type": "accountant"
   },
   "service_type": "offered",
-  "title": "Professional Tax Filing Service for Small Businesses",
-  "description": "I provide comprehensive tax filing services for small businesses...",
-  "category": {
-    "id": "uuid-here",
-    "name": "Tax Preparation",
-    "description": "Services related to tax preparation and filing",
-    "is_active": true,
-    "created_at": "2025-01-01T12:00:00Z",
-    "updated_at": "2025-01-01T12:00:00Z"
-  },
-  "price": "400.00",
-  "price_negotiable": false,
-  "estimated_duration": 3,
+  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
+  "description": "أوفر خدمة إعداد وتقديم التصريحات الجبائية الشهرية للشركات والتجار بما في ذلك:\n• تصريح الضريبة على الدخل الإجمالي (IRG)\n• الضريبة على القيمة المضافة (TVA)\n• الضريبة على أرباح الشركات (IBS)\nأقوم بتحليل الوثائق، حساب القيم المستحقة، وملء التصاريح وفقاً للقوانين الجبائية الجزائرية.",
+  "categories": [
+    {
+      "id": "uuid-here",
+      "name": "التصريحات الجبائية"
+    },
+    {
+      "id": "uuid-here",
+      "name": "الامتثال الجبائي والقانوني"
+    }
+  ],
+  "location": "16",
+  "estimated_duration": 2,
   "duration_unit": "days",
-  "deadline": null,
-  "experience_level_required": "expert",
-  "skills_keywords": "CPA, tax filing, small business, QuickBooks, depreciation",
-  "urgency_level": "any",
-  "location_preference": "online",
-  "requirements_notes": "Client must provide all necessary documents before service begins",
-  "attachments": null,
+  "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "price": "8000.00",
+  "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
+  "delivery_method": "online",
+  "attachments": {
+    "url": "https://example.com/tax_declaration_sample.pdf",
+    "filename": "نموذج تصريح جبائي سابق.pdf"
+  },
+  "is_active": true,
+  "is_featured": false,
   "created_at": "2025-01-01T12:00:00Z"
 }
 ```
 
-**Response (Error - 400):**
+**Client Service Request Example:**
 
 ```json
 {
-  "title": ["This field is required."],
-  "category": ["Either select an existing category or add new one"],
-  "non_field_errors": [
-    "Invalid user type. Only clients and accountants can create services."
-  ]
+  "id": "uuid-here",
+  "user": {
+    "pk": "uuid-here",
+    "email": "client@example.com",
+    "full_name": "اسم الشركة",
+    "user_type": "client"
+  },
+  "service_type": "needed",
+  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
+  "description": "نحن شركة توزيع مواد غذائية مقرها في ولاية وهران نبحث عن محاسب معتمد للقيام بإعداد وتقديم التصريحات الجبائية الخاصة بنا (IRG, TVA, IBS) بشكل دوري",
+  "categories": [
+    {
+      "id": "uuid-here",
+      "name": "التصريحات الجبائية"
+    }
+  ],
+  "location": "31",
+  "tasks_and_responsibilities": [
+    "جمع وتحليل الوثائق المالية",
+    "إعداد التصريحات الضريبية"
+  ],
+  "conditions_requirements": [
+    "محاسب معتمد أو خبير محاسبي",
+    "الالتزام بالسرية والحذر المهني"
+  ],
+  "estimated_duration": 1,
+  "duration_unit": "weeks",
+  "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "price": "8000.00",
+  "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
+  "delivery_method": "online",
+  "attachments": {
+    "url": "https://example.com/company_documents.pdf",
+    "filename": "نسخة من دفتري كمحاسب معتمد.pdf"
+  },
+  "is_active": true,
+  "is_featured": false,
+  "created_at": "2025-01-01T12:00:00Z"
 }
 ```
 
@@ -871,9 +726,102 @@ Both clients and accountants can include file attachments with their services us
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Retrieves detailed information about a specific service owned by the user.
+**Description:** Retrieves detailed information about a specific service owned by the user. The response fields are customized based on the service type:
 
-**Response (Success - 200):** Full service object with all fields
+- **"offered" services**: Show service details (price, duration, delivery method)
+- **"needed" services**: Show request details (tasks, conditions, requirements)
+
+**Response (Success - 200):**
+
+**Accountant Viewing Service Details:**
+
+```json
+{
+  "id": "uuid-here",
+  "user": {
+    "pk": "uuid-here",
+    "email": "accountant@example.com",
+    "full_name": "الأستاذ عبد القادر بن يوسف",
+    "user_type": "accountant"
+  },
+  "service_type": "offered",
+  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
+  "description": "أوفر خدمة إعداد وتقديم التصريحات الجبائية الشهرية للشركات والتجار...",
+  "categories": [
+    {
+      "id": "uuid-here",
+      "name": "التصريحات الجبائية"
+    }
+  ],
+  "price": "8000.00",
+  "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
+  "estimated_duration": 2,
+  "duration_unit": "days",
+  "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "location": "16",
+  "delivery_method": "online",
+  "attachments": {
+    "url": "https://example.com/tax_declaration_sample.pdf",
+    "filename": "نموذج تصريح جبائي سابق.pdf"
+  },
+  "is_active": true,
+  "is_featured": false,
+  "created_at": "2025-01-01T12:00:00Z",
+  "updated_at": "2025-01-01T12:00:00Z"
+}
+```
+
+**Client Viewing Service Details:**
+
+```json
+{
+  "id": "uuid-here",
+  "user": {
+    "pk": "uuid-here",
+    "email": "client@example.com",
+    "full_name": "اسم الشركة",
+    "user_type": "client"
+  },
+  "service_type": "needed",
+  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
+  "description": "نحن شركة توزيع مواد غذائية مقرها في ولاية وهران نبحث عن محاسب معتمد...",
+  "categories": [
+    {
+      "id": "uuid-here",
+      "name": "التصريحات الجبائية"
+    }
+  ],
+  "tasks_and_responsibilities": [
+    "جمع وتحليل الوثائق المالية",
+    "إعداد التصريحات الضريبية"
+  ],
+  "conditions_requirements": [
+    "محاسب معتمد أو خبير محاسبي",
+    "الالتزام بالسرية والحذر المهني"
+  ],
+  "estimated_duration": 1,
+  "duration_unit": "weeks",
+  "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "price": "8000.00",
+  "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
+  "location": "31",
+  "delivery_method": "online",
+  "attachments": {
+    "url": "https://example.com/company_documents.pdf",
+    "filename": "نسخة من دفتري كمحاسب معتمد.pdf"
+  },
+  "is_active": true,
+  "is_featured": false,
+  "created_at": "2025-01-01T12:00:00Z",
+  "updated_at": "2025-01-01T12:00:00Z"
+}
+```
+
+**Key Differences:**
+
+- **"offered" services** (AccountantServiceDetailSerializer): Show `price`, `price_description`, `estimated_duration` fields (focus on service offering details)
+- **"needed" services** (ClientServiceDetailSerializer): Show `tasks_and_responsibilities`, `conditions_requirements` fields (focus on service requirements)
+- Both show common fields: `title`, `description`, `categories`, `location`, `delivery_method`, `attachments`
 
 #### Update Service 🔒
 
@@ -885,15 +833,43 @@ Both clients and accountants can include file attachments with their services us
 
 **Request Body (PATCH example):**
 
+**Accountant Update Example:**
+
 ```json
 {
-  "title": "Updated Tax Filing for Small Business",
-  "price": 600.0,
-  "urgency_level": "high"
+  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
+  "description": "خدمة محدثة: أوفر خدمة إعداد وتقديم التصريحات الجبائية الشهرية مع متابعة إضافية",
+  "estimated_duration": 3,
+  "estimated_duration_description": "من 2 إلى 5 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "price": 9000,
+  "price_description": "ابتداء من 9000 دج - السعر محدث ويشمل خدمات إضافية",
+  "delivery_method": "online"
 }
 ```
 
-**Response (Success - 200):** Updated service object
+**Client Update Example:**
+
+````json
+{
+  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
+  "description": "تحديث: نحن شركة توزيع مواد غذائية نبحث عن محاسب معتمد مع خبرة إضافية في النظام الجبائي الجديد",
+  "tasks_and_responsibilities": [
+    "جمع وتحليل الوثائق المالية",
+    "إعداد التصريحات الضريبية",
+    "تقديم الاستشارة حول النظام الجبائي الجديد"
+  ],
+  "conditions_requirements": [
+    "محاسب معتمد أو خبير محاسبي",
+    "خبرة في النظام الجبائي الجديد",
+    "الالتزام بالسرية والحذر المهني"
+  ],
+  "estimated_duration": 2,
+  "duration_unit": "weeks",
+  "price": 9500,
+  "price_description": "ابتداء من 9500 دج - السعر محدث يشمل الاستشارة الإضافية",
+  "delivery_method": "online"
+}
+```**Response (Success - 200):** Updated service object
 
 #### Delete Service 🔒
 
@@ -920,7 +896,8 @@ Both clients and accountants can include file attachments with their services us
 
 **Query Parameters:**
 
-```
+````
+
 ?search=tax filing
 &category=uuid-here
 &location_preference=online,flexible
@@ -937,6 +914,7 @@ Both clients and accountants can include file attachments with their services us
 &created_before=2025-12-31
 &ordering=-created_at
 &page=1
+
 ```
 
 **Available Filters:**
@@ -977,14 +955,18 @@ Both clients and accountants can include file attachments with their services us
 **For Clients (sees offered services):**
 
 ```
+
 GET /services/browse/?search=tax&urgency_level=high&max_price=500
+
 ```
 
 **For Accountants (sees needed services):**
 
 ```
+
 GET /services/browse/?search=bookkeeping&location_preference=online&min_price=200
-```
+
+````
 
 **Response (Success - 200):**
 
@@ -1018,7 +1000,7 @@ GET /services/browse/?search=bookkeeping&location_preference=online&min_price=20
     }
   ]
 }
-```
+````
 
 #### View Service Details 🔒
 
@@ -1026,9 +1008,17 @@ GET /services/browse/?search=bookkeeping&location_preference=online&min_price=20
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** View detailed information about any active service.
+**Description:** View detailed information about any active service. The response fields are customized based on the service type being viewed:
 
-**Response (Success - 200):** Full service object with all fields
+- **"offered" services** (accountant services): Show service details like price, duration, delivery method
+- **"needed" services** (client requests): Show request details like tasks, conditions, requirements
+
+This means:
+
+- Anyone viewing an accountant's offered service sees the service details format
+- Anyone viewing a client's needed service sees the request details format
+
+**Response (Success - 200):** Role-specific service object (same format as "Get Service Details" above)
 
 ---
 
@@ -1423,9 +1413,10 @@ If the user needs a category that doesn't exist:
 
 ### User Types and Permissions
 
-- **client**: Can book services, create "needed" services, search for offered services , access chat with accountants
-- **accountant** Can create "offered" services, search for needed services ,respond to "needed" services, access chat with all users, create group chats
-- **academic**: Can access chat with accountants , cannot access service marketplace (learning features planned for future)
+- **client**: Can book services, create "needed" services, search for offered services
+- **accountant**: Can create "offered" services, search for needed services, respond to "needed" services
+- **academic**: Limited access (future features planned)
+- **admin**: Full platform access and management capabilities
 - **admin**: Administrative access to all platform features
 
 ---

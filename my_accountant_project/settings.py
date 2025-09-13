@@ -25,7 +25,7 @@ ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]
 
 INSTALLED_APPS = [
     "daphne",
-    "django_extensions",
+    "django_extensions",  
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "bookings",
     "chat",
     "learning",
+    "notifications",
 ]
 # Use custom adapter to populate full_name on social login
 SOCIALACCOUNT_ADAPTER = "accounts.adapters.CustomSocialAccountAdapter"

@@ -9,15 +9,10 @@ class ServiceFilter(django_filters.FilterSet):
     search = django_filters.CharFilter(method="filter_search", label="Search")
 
     # Category filters
-    category = django_filters.ModelMultipleChoiceFilter(
+    categories = django_filters.ModelMultipleChoiceFilter(
         queryset=ServiceCategory.objects.filter(is_active=True),
-        field_name="category",
+        field_name="categories",
         to_field_name="id",
-    )
-
-    # Location preference filters
-    location_preference = django_filters.MultipleChoiceFilter(
-        choices=Service.LOCATION_CHOICES, field_name="location_preference"
     )
 
     # Geographic location filter
@@ -25,22 +20,9 @@ class ServiceFilter(django_filters.FilterSet):
         choices=Service.WILAYA_CHOICES, field_name="location"
     )
 
-    # Experience level filters
-    experience_level_required = django_filters.MultipleChoiceFilter(
-        choices=Service.EXPERIENCE_LEVEL_CHOICES, field_name="experience_level_required"
-    )
-
-    # Urgency level filters
-    urgency_level = django_filters.MultipleChoiceFilter(
-        choices=Service.URGENCY_CHOICES, field_name="urgency_level"
-    )
-
     # Price range filters
     min_price = django_filters.NumberFilter(field_name="price", lookup_expr="gte")
     max_price = django_filters.NumberFilter(field_name="price", lookup_expr="lte")
-
-    # Price negotiable filter
-    price_negotiable = django_filters.BooleanFilter(field_name="price_negotiable")
 
     # Duration filters
     duration_unit = django_filters.MultipleChoiceFilter(
@@ -69,14 +51,10 @@ class ServiceFilter(django_filters.FilterSet):
         model = Service
         fields = [
             "search",
-            "category",
-            "location_preference",
+            "categories",
             "location",
-            "experience_level_required",
-            "urgency_level",
             "min_price",
             "max_price",
-            "price_negotiable",
             "duration_unit",
             "min_duration",
             "max_duration",
@@ -90,13 +68,10 @@ class ServiceFilter(django_filters.FilterSet):
     def filter_search(self, queryset, name, value):
         """Search across multiple fields in services"""
         if value:
-
             return queryset.filter(
                 Q(title__icontains=value)
                 | Q(description__icontains=value)
-                | Q(skills_keywords__icontains=value)
-                | Q(requirements_notes__icontains=value)
                 | Q(user__full_name__icontains=value)
                 | Q(location__icontains=value)
-                | Q(category__name__icontains=value)
-            )
+                | Q(categories__name__icontains=value)
+            ).distinct()

@@ -1,9 +1,14 @@
 from .serializers import (
     ServiceListSerializer,
     ServiceDetailSerializer,
+    AccountantServiceDetailSerializer,
+    ClientServiceDetailSerializer,
     ServiceCreateSerializer,
     ServiceUpdateSerializer,
+)
+from .category_serializers import (
     ServiceCategorySerializer,
+    ServiceCategoryCreateSerializer,
 )
 
 from rest_framework import generics
@@ -52,11 +57,10 @@ class PublicServiceListAPIView(generics.ListAPIView):
     search_fields = [
         "title",
         "description",
-        "skills_keywords",
         "user__full_name",
-        "category__name",
+        "categories__name",
     ]
-    ordering_fields = ["created_at", "price", "urgency_level", "estimated_duration"]
+    ordering_fields = ["created_at", "price", "estimated_duration"]
     ordering = ["-created_at"]
 
     def get_queryset(self):
@@ -75,9 +79,20 @@ class PublicServiceListAPIView(generics.ListAPIView):
 
 
 class PublicServiceDetailAPIView(generics.RetrieveAPIView):
-    serializer_class = ServiceDetailSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "pk"
+
+    def get_serializer_class(self):
+        
+        service = self.get_object()
+
+        if service.service_type == "offered":
+           
+            return AccountantServiceDetailSerializer
+        elif service.service_type == "needed":
+            
+            return ClientServiceDetailSerializer
+        return ServiceDetailSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -86,13 +101,15 @@ class PublicServiceDetailAPIView(generics.RetrieveAPIView):
         if role == "client":
             return (
                 Service.objects.filter(is_active=True, service_type="offered")
-                .select_related("category", "user")
+                .select_related("user")
+                .prefetch_related("categories")
                 .exclude(user=user)
             )
         if role == "accountant":
             return (
                 Service.objects.filter(is_active=True, service_type="needed")
-                .select_related("category", "user")
+                .select_related("user")
+                .prefetch_related("categories")
                 .exclude(user=user)
             )
         return None
@@ -105,20 +122,35 @@ class UserServiceListAPIView(generics.ListAPIView):
     def get_queryset(self):
         return (
             Service.objects.filter(user=self.request.user, is_active=True)
-            .select_related("category")
+            .select_related("user")
+            .prefetch_related("categories")
             .order_by("-created_at")
         )
 
 
 class ServiceDetailAPIView(generics.RetrieveAPIView):
-    serializer_class = ServiceDetailSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "pk"
 
+    def get_serializer_class(self):
+        """Return serializer based on the SERVICE TYPE being viewed, not user role"""
+        # Get the service instance to check its type
+        service = self.get_object()
+
+        if service.service_type == "offered":
+            # Viewing an accountant's offered service - show service details (price, duration, etc.)
+            return AccountantServiceDetailSerializer
+        elif service.service_type == "needed":
+            # Viewing a client's needed service - show request details (tasks, conditions, etc.)
+            return ClientServiceDetailSerializer
+        return ServiceDetailSerializer
+
     def get_queryset(self):
-        return Service.objects.filter(
-            user=self.request.user, is_active=True
-        ).select_related("category")
+        return (
+            Service.objects.filter(user=self.request.user, is_active=True)
+            .select_related("user")
+            .prefetch_related("categories")
+        )
 
 
 class ServiceDeleteAPIView(generics.DestroyAPIView):
@@ -150,7 +182,7 @@ class ServiceDeleteAPIView(generics.DestroyAPIView):
 
 class ServiceCategoryListAPIView(generics.ListAPIView):
     """
-    List all active service categories
+    List only default (admin-created) service categories for dropdown
     """
 
     serializer_class = ServiceCategorySerializer
