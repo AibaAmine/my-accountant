@@ -167,7 +167,7 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             "location",
             "location_description",
             "delivery_method",
-            "upload_files", 
+            "upload_files",
             "created_at",
         ]
         read_only_fields = ("id", "created_at", "user", "service_type", "updated_at")
@@ -253,10 +253,6 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
     upload_files = serializers.ListField(
         child=serializers.FileField(), write_only=True, required=False
     )
-    # Option to remove specific attachments
-    remove_attachment_ids = serializers.ListField(
-        child=serializers.UUIDField(), write_only=True, required=False
-    )
 
     class Meta:
         model = Service
@@ -277,8 +273,7 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
             "location",
             "location_description",
             "delivery_method",
-            "upload_files",  
-            "remove_attachment_ids",  
+            "upload_files",
         ]
         read_only_fields = ("id", "user", "service_type", "created_at", "updated_at")
 
@@ -322,7 +317,6 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         categories = validated_data.pop("categories", None)
         upload_files = validated_data.pop("upload_files", [])
-        remove_attachment_ids = validated_data.pop("remove_attachment_ids", [])
 
         # Update the service first
         service = super().update(instance, validated_data)
@@ -335,14 +329,12 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
                 existing_categories = ServiceCategory.objects.filter(id__in=categories)
                 service.categories.add(*existing_categories)
 
-        # Remove specified attachments
-        if remove_attachment_ids:
-            ServiceAttachment.objects.filter(
-                service=service, id__in=remove_attachment_ids
-            ).delete()
-
-        # Add new files
+        # Handle multiple file uploads - replace all existing attachments
         if upload_files:
+            # Delete all existing attachments
+            service.service_attachments.all().delete()
+
+            # Add new files
             for file in upload_files:
                 ServiceAttachment.objects.create(
                     service=service, file=file, original_filename=file.name

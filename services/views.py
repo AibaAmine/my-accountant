@@ -79,7 +79,7 @@ class ServiceUpdateAPIView(generics.UpdateAPIView):
 
             # Copy all text fields
             for key, value in request.data.items():
-                if key not in ["upload_files", "remove_attachment_ids"]:
+                if key not in ["upload_files"]:
                     data[key] = value
 
             # Handle categories JSON parsing
@@ -95,11 +95,6 @@ class ServiceUpdateAPIView(generics.UpdateAPIView):
             upload_files = request.FILES.getlist("upload_files")
             if upload_files:
                 data["upload_files"] = upload_files
-
-            # Handle removal list
-            remove_ids = request.data.getlist("remove_attachment_ids")
-            if remove_ids:
-                data["remove_attachment_ids"] = remove_ids
 
         else:
             # For JSON requests, use data as-is

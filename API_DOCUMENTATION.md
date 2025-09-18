@@ -1120,8 +1120,7 @@ Content-Type: multipart/form-data
 title: "Updated Tax Declaration Preparation"
 description: "Updated service description..."
 price: 9000
-upload_files: [file1.pdf, file2.pdf]  // New files to add
-remove_attachment_ids: ["uuid1", "uuid2"]  // Existing files to remove
+upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these new files
 ```
 
 **Response (Success - 200):** Updated service object
