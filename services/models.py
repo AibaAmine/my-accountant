@@ -193,12 +193,6 @@ class Service(models.Model):
         help_text="How the service will be delivered",
     )
 
-    attachments = models.FileField(
-        upload_to="service_attachments/",
-        null=True,
-        blank=True,
-    )
-
     # Status
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
@@ -225,10 +219,10 @@ class Service(models.Model):
         return ", ".join([cat.name for cat in self.categories.all()])
 
     def get_all_attachments(self):
-        """Return all attachments including both old single file and new multiple files"""
+        """Return all service attachments"""
         attachments_list = []
 
-        # Add new multiple attachments
+        # Add multiple attachments
         for attachment in self.service_attachments.all():
             attachments_list.append(
                 {
@@ -237,26 +231,6 @@ class Service(models.Model):
                     "filename": attachment.original_filename,
                     "size": attachment.file_size,
                     "uploaded_at": attachment.uploaded_at,
-                }
-            )
-
-        # Add legacy single attachment if exists (for backward compatibility)
-        if self.attachments:
-            attachments_list.append(
-                {
-                    "id": "legacy",
-                    "url": self.attachments.url,
-                    "filename": (
-                        self.attachments.name.split("/")[-1]
-                        if self.attachments.name
-                        else "file"
-                    ),
-                    "size": (
-                        self.attachments.size
-                        if hasattr(self.attachments, "size")
-                        else None
-                    ),
-                    "uploaded_at": self.created_at,
                 }
             )
 

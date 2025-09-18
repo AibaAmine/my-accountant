@@ -2,12 +2,13 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.response import Response
 from .serializers import (
     AccountantProfileSerializer,
     ClientProfileSerializer,
     AcademicProfileSerializer,
 )
-from .models import AccountantProfile, ClientProfile, AcademicProfile
+from .models import AccountantProfile, ClientProfile, AcademicProfile, ProfileAttachment
 
 
 # Accountant Profile Views
@@ -29,6 +30,42 @@ class AccountantProfileAPIView(generics.RetrieveUpdateAPIView):
             raise PermissionDenied("You do not have permission to update this profile.")
         serializer.save()
 
+    def update(self, request, *args, **kwargs):
+        """Custom update method to handle form-data with files"""
+        instance = self.get_object()
+        
+        # Check if this is form-data request with files
+        if hasattr(request, 'content_type') and 'multipart/form-data' in request.content_type:
+            # Handle form-data
+            data = {}
+            for key, value in request.data.items():
+                if key != 'upload_files':
+                    data[key] = value
+            
+            # Handle multiple file uploads
+            upload_files = request.FILES.getlist('upload_files')
+            if upload_files:
+                # Delete existing attachments
+                instance.profile_attachments.all().delete()
+                
+                # Create new attachments
+                for file in upload_files:
+                    ProfileAttachment.objects.create(
+                        accountant_profile=instance,
+                        file=file,
+                        original_filename=file.name,
+                        file_size=file.size
+                    )
+        else:
+            # Handle JSON data normally
+            data = request.data
+            
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response(serializer.data)
+
 
 # Client Profile Views
 class ClientProfileAPIView(generics.RetrieveUpdateAPIView):
@@ -49,6 +86,42 @@ class ClientProfileAPIView(generics.RetrieveUpdateAPIView):
             raise PermissionDenied("You do not have permission to update this profile.")
         serializer.save()
 
+    def update(self, request, *args, **kwargs):
+        """Custom update method to handle form-data with files"""
+        instance = self.get_object()
+        
+        # Check if this is form-data request with files
+        if hasattr(request, 'content_type') and 'multipart/form-data' in request.content_type:
+            # Handle form-data
+            data = {}
+            for key, value in request.data.items():
+                if key != 'upload_files':
+                    data[key] = value
+            
+            # Handle multiple file uploads
+            upload_files = request.FILES.getlist('upload_files')
+            if upload_files:
+                # Delete existing attachments
+                instance.profile_attachments.all().delete()
+                
+                # Create new attachments
+                for file in upload_files:
+                    ProfileAttachment.objects.create(
+                        client_profile=instance,
+                        file=file,
+                        original_filename=file.name,
+                        file_size=file.size
+                    )
+        else:
+            # Handle JSON data normally
+            data = request.data
+            
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response(serializer.data)
+
 
 # Academic Profile Views
 class AcademicProfileAPIView(generics.RetrieveUpdateAPIView):
@@ -68,3 +141,39 @@ class AcademicProfileAPIView(generics.RetrieveUpdateAPIView):
         if serializer.instance.user != self.request.user:
             raise PermissionDenied("You do not have permission to update this profile.")
         serializer.save()
+
+    def update(self, request, *args, **kwargs):
+        """Custom update method to handle form-data with files"""
+        instance = self.get_object()
+        
+        # Check if this is form-data request with files
+        if hasattr(request, 'content_type') and 'multipart/form-data' in request.content_type:
+            # Handle form-data
+            data = {}
+            for key, value in request.data.items():
+                if key != 'upload_files':
+                    data[key] = value
+            
+            # Handle multiple file uploads
+            upload_files = request.FILES.getlist('upload_files')
+            if upload_files:
+                # Delete existing attachments
+                instance.profile_attachments.all().delete()
+                
+                # Create new attachments
+                for file in upload_files:
+                    ProfileAttachment.objects.create(
+                        academic_profile=instance,
+                        file=file,
+                        original_filename=file.name,
+                        file_size=file.size
+                    )
+        else:
+            # Handle JSON data normally
+            data = request.data
+            
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response(serializer.data)

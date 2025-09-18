@@ -414,6 +414,8 @@ The platform supports role-based profile management for different user types. Ea
 
 **Request Body (PUT/PATCH):**
 
+For regular profile updates (JSON):
+
 ```json
 {
   "profile_picture": "image_file",
@@ -429,9 +431,22 @@ The platform supports role-based profile management for different user types. Ea
     "saturday": "closed",
     "sunday": "closed"
   },
-  "attachments": "certification_file.pdf",
   "is_available": true
 }
+```
+
+For multiple file uploads (form-data):
+
+```
+Content-Type: multipart/form-data
+
+phone: "+1234567890"
+location: "Algiers, Algeria"
+bio: "Experienced CPA with 10+ years in tax preparation..."
+working_hours: {"monday": {"start": "09:00", "end": "17:00"}, ...}
+is_available: true
+upload_files: [file1.pdf, file2.pdf, file3.pdf]  // Multiple files
+profile_picture: profile_image.jpg
 ```
 
 **Response (Success - 200):**
@@ -463,7 +478,23 @@ The platform supports role-based profile management for different user types. Ea
     "saturday": "closed",
     "sunday": "closed"
   },
-  "attachments": "https://example.com/certification_file.pdf",
+  "all_attachments": [
+    {
+      "id": "uuid-here",
+      "url": "/media/profile_attachments/certification.pdf",
+      "filename": "شهادة الخبرة المحاسبية.pdf",
+      "size": 245760,
+      "uploaded_at": "2025-01-01T12:00:00Z"
+    },
+    {
+      "id": "uuid-here",
+      "url": "/media/profile_attachments/license.pdf",
+      "filename": "ترخيص مزاولة المهنة.pdf",
+      "size": 134567,
+      "uploaded_at": "2025-01-01T12:00:00Z"
+    }
+  ],
+  "attachments_count": 2,
   "all_services": [
     {
       "id": "uuid-here",
@@ -494,14 +525,27 @@ The platform supports role-based profile management for different user types. Ea
 
 **Request Body (PUT/PATCH):**
 
+For regular profile updates (JSON):
+
 ```json
 {
   "profile_picture": "image_file",
   "phone": "+1234567890",
   "location": "Oran, Algeria",
-  "activity_type": "Food Distribution Company",
-  "attachments": "company_documents.pdf"
+  "activity_type": "Food Distribution Company"
 }
+```
+
+For multiple file uploads (form-data):
+
+```
+Content-Type: multipart/form-data
+
+phone: "+1234567890"
+location: "Oran, Algeria"
+activity_type: "Food Distribution Company"
+upload_files: [file1.pdf, file2.pdf]  // Multiple files
+profile_picture: profile_image.jpg
 ```
 
 **Response (Success - 200):**
@@ -524,7 +568,16 @@ The platform supports role-based profile management for different user types. Ea
   "phone": "+1234567890",
   "location": "Oran, Algeria",
   "activity_type": "Food Distribution Company",
-  "attachments": "https://example.com/company_documents.pdf",
+  "all_attachments": [
+    {
+      "id": "uuid-here",
+      "url": "/media/profile_attachments/company_registration.pdf",
+      "filename": "شهادة التسجيل التجاري.pdf",
+      "size": 512000,
+      "uploaded_at": "2025-01-01T12:00:00Z"
+    }
+  ],
+  "attachments_count": 1,
   "all_services": [
     {
       "id": "uuid-here",
@@ -554,13 +607,25 @@ The platform supports role-based profile management for different user types. Ea
 
 **Request Body (PUT/PATCH):**
 
+For regular profile updates (JSON):
+
 ```json
 {
   "profile_picture": "image_file",
   "phone": "+1234567890",
-  "bio": "Professor of Accounting at University...",
-  "attachments": "academic_credentials.pdf"
+  "bio": "Professor of Accounting at University..."
 }
+```
+
+For multiple file uploads (form-data):
+
+```
+Content-Type: multipart/form-data
+
+phone: "+1234567890"
+bio: "Professor of Accounting at University..."
+upload_files: [file1.pdf, file2.pdf]  // Multiple files
+profile_picture: profile_image.jpg
 ```
 
 **Response (Success - 200):**
@@ -582,7 +647,23 @@ The platform supports role-based profile management for different user types. Ea
   "profile_picture": "https://example.com/profile.jpg",
   "phone": "+1234567890",
   "bio": "Professor of Accounting at University...",
-  "attachments": "https://example.com/academic_credentials.pdf",
+  "all_attachments": [
+    {
+      "id": "uuid-here",
+      "url": "/media/profile_attachments/phd_certificate.pdf",
+      "filename": "شهادة الدكتوراه في المحاسبة.pdf",
+      "size": 345678,
+      "uploaded_at": "2025-01-01T12:00:00Z"
+    },
+    {
+      "id": "uuid-here",
+      "url": "/media/profile_attachments/research_papers.pdf",
+      "filename": "الأوراق البحثية المنشورة.pdf",
+      "size": 1024000,
+      "uploaded_at": "2025-01-01T12:00:00Z"
+    }
+  ],
+  "attachments_count": 2,
   "created_at": "2025-01-01T12:00:00Z",
   "updated_at": "2025-01-01T12:00:00Z"
 }
@@ -593,8 +674,12 @@ The platform supports role-based profile management for different user types. Ea
 - **Automatic Profile Creation**: Profiles are created automatically via Django signals when users register
 - **Role-Based Access**: Each user type can only access their corresponding profile endpoint
 - **Service Integration**: Accountant and Client profiles include an `all_services` field showing all active services created by the user
+- **Multiple File Attachments**: Profiles support multiple file uploads using the `upload_files` field with form-data
+- **File Downloads**: All attachment files are directly downloadable via their URL paths
+- **File Metadata**: Each attachment includes filename, size, upload timestamp, and unique ID
+- **Attachment Count**: `attachments_count` field shows total number of files attached to profile
 - **File Handling**: Profile pictures and attachments are properly handled with full URLs in responses
-- **Read-Only Fields**: `profile_id`, `user`, `created_at`, and `updated_at` are automatically managed
+- **Read-Only Fields**: `profile_id`, `user`, `all_attachments`, `attachments_count`, `created_at`, and `updated_at` are automatically managed
 
 ````
 
@@ -1002,9 +1087,9 @@ Content-Type: multipart/form-data
 
 **Key Differences:**
 
-- **"offered" services** (AccountantServiceDetailSerializer): Show `price`, `price_description`, `estimated_duration` fields (focus on service offering details)
-- **"needed" services** (ClientServiceDetailSerializer): Show `tasks_and_responsibilities`, `conditions_requirements` fields (focus on service requirements)
-- Both show common fields: `title`, `description`, `categories`, `location`, `delivery_method`, `attachments`
+- **"offered" services** : Show `price`, `price_description`, `estimated_duration` fields (focus on service offering details)
+- **"needed" services** : Show `tasks_and_responsibilities`, `conditions_requirements` fields (focus on service requirements)
+- Both show common fields: `title`, `description`, `categories`, `location`, `delivery_method`, `all_attachments`
 
 #### Update Service 🔒
 
@@ -1016,6 +1101,8 @@ Content-Type: multipart/form-data
 
 **Request Body (PATCH example):**
 
+For regular updates (JSON):
+
 ```json
 {
   "title": "Updated Tax Declaration Preparation",
@@ -1023,6 +1110,18 @@ Content-Type: multipart/form-data
   "price": 9000,
   "price_description": "Updated pricing starting from 9000 DZD"
 }
+```
+
+For multiple file updates (form-data):
+
+```
+Content-Type: multipart/form-data
+
+title: "Updated Tax Declaration Preparation"
+description: "Updated service description..."
+price: 9000
+upload_files: [file1.pdf, file2.pdf]  // New files to add
+remove_attachment_ids: ["uuid1", "uuid2"]  // Existing files to remove
 ```
 
 **Response (Success - 200):** Updated service object

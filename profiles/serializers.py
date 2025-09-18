@@ -1,11 +1,38 @@
 from rest_framework import serializers
-from .models import AccountantProfile, ClientProfile, AcademicProfile
+from .models import AccountantProfile, ClientProfile, AcademicProfile, ProfileAttachment
 from accounts.serializers import CustomUserDetailsSerializer
+
+
+class ProfileAttachmentSerializer(serializers.ModelSerializer):
+    """Serializer for profile attachments"""
+
+    url = serializers.SerializerMethodField()
+    filename = serializers.CharField(source="original_filename", read_only=True)
+    size = serializers.IntegerField(source="file_size", read_only=True)
+
+    class Meta:
+        model = ProfileAttachment
+        fields = ["attachment_id", "url", "filename", "size", "uploaded_at"]
+        read_only_fields = ["attachment_id", "uploaded_at"]
+
+    def get_url(self, obj):
+        request = self.context.get("request")
+        if obj.file and request:
+            return request.build_absolute_uri(obj.file.url)
+        return obj.file.url if obj.file else None
 
 
 class AccountantProfileSerializer(serializers.ModelSerializer):
     user = CustomUserDetailsSerializer(read_only=True)
     all_services = serializers.SerializerMethodField()
+    all_attachments = serializers.SerializerMethodField()
+    attachments_count = serializers.SerializerMethodField()
+    upload_files = serializers.ListField(
+        child=serializers.FileField(),
+        write_only=True,
+        required=False,
+        help_text="Upload multiple files for the profile",
+    )
 
     class Meta:
         model = AccountantProfile
@@ -17,7 +44,9 @@ class AccountantProfileSerializer(serializers.ModelSerializer):
             "location",
             "bio",
             "working_hours",
-            "attachments",
+            "all_attachments",
+            "attachments_count",
+            "upload_files",
             "all_services",
             "is_available",
             "created_at",
@@ -26,16 +55,24 @@ class AccountantProfileSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "profile_id",
             "user",
+            "all_attachments",
+            "attachments_count",
             "created_at",
             "updated_at",
         ]
 
     def get_all_services(self, obj):
         """Get all services for this user"""
-        from services.serializers import ServiceSerializer
+        from services.serializers import ServiceListSerializer
 
         services = obj.user.services.filter(is_active=True)
-        return ServiceSerializer(services, many=True, context=self.context).data
+        return ServiceListSerializer(services, many=True, context=self.context).data
+
+    def get_all_attachments(self, obj):
+        return obj.get_all_attachments()
+
+    def get_attachments_count(self, obj):
+        return len(obj.get_all_attachments())
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -45,14 +82,20 @@ class AccountantProfileSerializer(serializers.ModelSerializer):
             data["profile_picture"] = request.build_absolute_uri(
                 instance.profile_picture.url
             )
-        if instance.attachments and request:
-            data["attachments"] = request.build_absolute_uri(instance.attachments.url)
         return data
 
 
 class ClientProfileSerializer(serializers.ModelSerializer):
     user = CustomUserDetailsSerializer(read_only=True)
     all_services = serializers.SerializerMethodField()
+    all_attachments = serializers.SerializerMethodField()
+    attachments_count = serializers.SerializerMethodField()
+    upload_files = serializers.ListField(
+        child=serializers.FileField(),
+        write_only=True,
+        required=False,
+        help_text="Upload multiple files for the profile",
+    )
 
     class Meta:
         model = ClientProfile
@@ -63,7 +106,9 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "phone",
             "location",
             "activity_type",
-            "attachments",
+            "all_attachments",
+            "attachments_count",
+            "upload_files",
             "all_services",
             "created_at",
             "updated_at",
@@ -71,16 +116,24 @@ class ClientProfileSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "profile_id",
             "user",
+            "all_attachments",
+            "attachments_count",
             "created_at",
             "updated_at",
         ]
 
     def get_all_services(self, obj):
         """Get all services for this user"""
-        from services.serializers import ServiceSerializer
+        from services.serializers import ServiceListSerializer
 
         services = obj.user.services.filter(is_active=True)
-        return ServiceSerializer(services, many=True, context=self.context).data
+        return ServiceListSerializer(services, many=True, context=self.context).data
+
+    def get_all_attachments(self, obj):
+        return obj.get_all_attachments()
+
+    def get_attachments_count(self, obj):
+        return len(obj.get_all_attachments())
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -90,13 +143,19 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             data["profile_picture"] = request.build_absolute_uri(
                 instance.profile_picture.url
             )
-        if instance.attachments and request:
-            data["attachments"] = request.build_absolute_uri(instance.attachments.url)
         return data
 
 
 class AcademicProfileSerializer(serializers.ModelSerializer):
     user = CustomUserDetailsSerializer(read_only=True)
+    all_attachments = serializers.SerializerMethodField()
+    attachments_count = serializers.SerializerMethodField()
+    upload_files = serializers.ListField(
+        child=serializers.FileField(),
+        write_only=True,
+        required=False,
+        help_text="Upload multiple files for the profile",
+    )
 
     class Meta:
         model = AcademicProfile
@@ -106,16 +165,28 @@ class AcademicProfileSerializer(serializers.ModelSerializer):
             "profile_picture",
             "phone",
             "bio",
-            "attachments",
+            "all_attachments",
+            "attachments_count",
+            "upload_files",
             "created_at",
             "updated_at",
         ]
         read_only_fields = [
             "profile_id",
             "user",
+            "all_attachments",
+            "attachments_count",
             "created_at",
             "updated_at",
         ]
+
+    def get_all_attachments(self, obj):
+        """Get all attachments including legacy and new attachments"""
+        return obj.get_all_attachments()
+
+    def get_attachments_count(self, obj):
+        """Get total count of all attachments"""
+        return len(obj.get_all_attachments())
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -125,6 +196,4 @@ class AcademicProfileSerializer(serializers.ModelSerializer):
             data["profile_picture"] = request.build_absolute_uri(
                 instance.profile_picture.url
             )
-        if instance.attachments and request:
-            data["attachments"] = request.build_absolute_uri(instance.attachments.url)
         return data

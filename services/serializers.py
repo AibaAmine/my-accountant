@@ -47,10 +47,7 @@ class ServiceListSerializer(serializers.ModelSerializer):
 
     def get_attachments_count(self, obj):
         """Return total number of attachments"""
-        count = obj.service_attachments.count()
-        if obj.attachments:  # Legacy attachment
-            count += 1
-        return count
+        return obj.service_attachments.count()
 
 
 class ServiceDetailSerializer(serializers.ModelSerializer):
@@ -170,7 +167,7 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             "location",
             "location_description",
             "delivery_method",
-            "upload_files",  # New field for multiple files
+            "upload_files", 
             "created_at",
         ]
         read_only_fields = ("id", "created_at", "user", "service_type", "updated_at")
@@ -280,8 +277,8 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
             "location",
             "location_description",
             "delivery_method",
-            "upload_files",  # New field for multiple files
-            "remove_attachment_ids",  # IDs of attachments to remove
+            "upload_files",  
+            "remove_attachment_ids",  
         ]
         read_only_fields = ("id", "user", "service_type", "created_at", "updated_at")
 

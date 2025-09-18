@@ -1,11 +1,68 @@
 import uuid
+import os
 from django.db import models
 from accounts.models import User
 
 
+class ProfileAttachment(models.Model):
+    """Model for storing multiple profile attachments"""
+
+    attachment_id = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, editable=False
+    )
+
+    # Generic relation to different profile types
+    accountant_profile = models.ForeignKey(
+        "AccountantProfile",
+        on_delete=models.CASCADE,
+        related_name="profile_attachments",
+        null=True,
+        blank=True,
+    )
+    client_profile = models.ForeignKey(
+        "ClientProfile",
+        on_delete=models.CASCADE,
+        related_name="profile_attachments",
+        null=True,
+        blank=True,
+    )
+    academic_profile = models.ForeignKey(
+        "AcademicProfile",
+        on_delete=models.CASCADE,
+        related_name="profile_attachments",
+        null=True,
+        blank=True,
+    )
+
+    file = models.FileField(upload_to="profile_attachments/")
+    original_filename = models.CharField(max_length=255)
+    file_size = models.BigIntegerField()
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "profile_attachments"
+        verbose_name = "Profile Attachment"
+        verbose_name_plural = "Profile Attachments"
+
+    def __str__(self):
+        return f"Attachment: {self.original_filename}"
+
+    @property
+    def filename(self):
+        return self.original_filename
+
+    @property
+    def size(self):
+        return self.file_size
+
+    @property
+    def url(self):
+        return self.file.url if self.file else None
+
+
 class AccountantProfile(models.Model):
     profile_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user= models.OneToOneField(
+    user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="accountant_profile"
     )
 
@@ -16,11 +73,6 @@ class AccountantProfile(models.Model):
     location = models.CharField(max_length=255, blank=True)
     bio = models.TextField(blank=True)
     working_hours = models.JSONField(default=dict)
-
-    attachments = models.FileField(
-        upload_to="documents/accountants/attachments/", null=True, blank=True
-    )
-    
     is_available = models.BooleanField(default=True)
 
     # Timestamps
@@ -34,6 +86,22 @@ class AccountantProfile(models.Model):
 
     def __str__(self):
         return f"Accountant: {self.user.full_name}"
+
+    def get_all_attachments(self):
+        """Get all profile attachments"""
+        attachments = []
+
+        for attachment in self.profile_attachments.all():
+            new_attachment = {
+                "id": str(attachment.attachment_id),
+                "url": attachment.url,
+                "filename": attachment.filename,
+                "size": attachment.size,
+                "uploaded_at": attachment.uploaded_at,
+            }
+            attachments.append(new_attachment)
+
+        return attachments
 
 
 class ClientProfile(models.Model):
@@ -49,11 +117,6 @@ class ClientProfile(models.Model):
     location = models.CharField(max_length=255, blank=True)
     activity_type = models.CharField(max_length=255, blank=True)
 
-    attachments = models.FileField(
-        upload_to="documents/clients/attachments/", null=True, blank=True
-    )
-
-    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -64,6 +127,23 @@ class ClientProfile(models.Model):
 
     def __str__(self):
         return f"Client: {self.user.full_name}"
+
+    def get_all_attachments(self):
+        """Get all profile attachments"""
+        attachments = []
+
+        # Add new attachments
+        for attachment in self.profile_attachments.all():
+            new_attachment = {
+                "id": str(attachment.attachment_id),
+                "url": attachment.url,
+                "filename": attachment.filename,
+                "size": attachment.size,
+                "uploaded_at": attachment.uploaded_at,
+            }
+            attachments.append(new_attachment)
+
+        return attachments
 
 
 class AcademicProfile(models.Model):
@@ -80,11 +160,6 @@ class AcademicProfile(models.Model):
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    attachments = models.FileField(
-        upload_to="documents/academics/attachments/", null=True, blank=True
-    )
 
     class Meta:
         db_table = "academic_profiles"
@@ -93,3 +168,20 @@ class AcademicProfile(models.Model):
 
     def __str__(self):
         return f"Academic: {self.user.full_name}"
+
+    def get_all_attachments(self):
+        """Get all profile attachments"""
+        attachments = []
+
+        # Add new attachments
+        for attachment in self.profile_attachments.all():
+            new_attachment = {
+                "id": str(attachment.attachment_id),
+                "url": attachment.url,
+                "filename": attachment.filename,
+                "size": attachment.size,
+                "uploaded_at": attachment.uploaded_at,
+            }
+            attachments.append(new_attachment)
+
+        return attachments
