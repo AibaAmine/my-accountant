@@ -27,6 +27,38 @@ class ServiceCategory(models.Model):
         return self.name
 
 
+class ServiceAttachment(models.Model):
+    """Separate model for handling multiple file attachments per service"""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    service = models.ForeignKey(
+        "Service", on_delete=models.CASCADE, related_name="service_attachments"
+    )
+    file = models.FileField(upload_to="service_attachments/")
+    original_filename = models.CharField(max_length=255)
+    file_size = models.PositiveIntegerField(help_text="File size in bytes")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "service_attachments"
+        verbose_name = "Service Attachment"
+        verbose_name_plural = "Service Attachments"
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return f"{self.original_filename} for {self.service.title}"
+
+    def save(self, *args, **kwargs):
+        if self.file:
+            # Store original filename
+            if not self.original_filename:
+                self.original_filename = self.file.name
+            # Store file size
+            if not self.file_size:
+                self.file_size = self.file.size
+        super().save(*args, **kwargs)
+
+
 class Service(models.Model):
 
     SERVICE_TYPE_CHOICES = [
@@ -161,9 +193,10 @@ class Service(models.Model):
         help_text="How the service will be delivered",
     )
 
-    # Additional details
     attachments = models.FileField(
-        upload_to="service_attachments/", null=True, blank=True
+        upload_to="service_attachments/",
+        null=True,
+        blank=True,
     )
 
     # Status
@@ -190,3 +223,41 @@ class Service(models.Model):
     def get_categories_display(self):
         """Return comma-separated list of category names"""
         return ", ".join([cat.name for cat in self.categories.all()])
+
+    def get_all_attachments(self):
+        """Return all attachments including both old single file and new multiple files"""
+        attachments_list = []
+
+        # Add new multiple attachments
+        for attachment in self.service_attachments.all():
+            attachments_list.append(
+                {
+                    "id": str(attachment.id),
+                    "url": attachment.file.url,
+                    "filename": attachment.original_filename,
+                    "size": attachment.file_size,
+                    "uploaded_at": attachment.uploaded_at,
+                }
+            )
+
+        # Add legacy single attachment if exists (for backward compatibility)
+        if self.attachments:
+            attachments_list.append(
+                {
+                    "id": "legacy",
+                    "url": self.attachments.url,
+                    "filename": (
+                        self.attachments.name.split("/")[-1]
+                        if self.attachments.name
+                        else "file"
+                    ),
+                    "size": (
+                        self.attachments.size
+                        if hasattr(self.attachments, "size")
+                        else None
+                    ),
+                    "uploaded_at": self.created_at,
+                }
+            )
+
+        return attachments_list

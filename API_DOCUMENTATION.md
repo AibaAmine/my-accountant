@@ -2,7 +2,7 @@
 
 ## Overview
 
-This documentation covers all APIs for the My Accountant platform, including authentication, user management, services, and bookings. The platform uses JWT (JSON Web Tokens) for authentication and supports email-based registration with OTP verification, social login (Google/Facebook), password reset, user profile management, service marketplace, and booking system.
+This documentation covers all APIs for the My Accountant platform, including authentication, user management, profile management, services marketplace, and booking system. The platform uses JWT (JSON Web Tokens) for authentication and supports email-based registration with OTP verification, social login (Google/Facebook), password reset, and comprehensive role-based service management.
 
 ## Base URL
 
@@ -53,7 +53,7 @@ https://my-accountant-j02f.onrender.com
 
 - `client` - Regular client user seeking accounting services
 - `accountant` - Professional accountant offering services
-- `academic` - Academic/instructor providing educational content
+- `academic` - Academic/instructor for educational content (limited access to marketplace)
 - `admin` - Administrator with full platform access
 
 **Response (Success - 201):**
@@ -400,25 +400,26 @@ https://my-accountant-j02f.onrender.com
 
 ---
 
-### 8. Accountant Profile Management
+### 8. Profile Management
 
-#### Create Accountant Profile 🔒
+The platform supports role-based profile management for different user types. Each user type has its own profile structure and endpoints. Profiles are **automatically created** when a user registers using Django signals, so there's no need for explicit profile creation endpoints.
 
-**Endpoint:** `POST /profiles/accountant/create/`
+#### Update/Retrieve Accountant Profile 🔒
+
+**Endpoint:** `GET/PUT/PATCH /profiles/accountant/`
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Creates a professional profile for accountants. Only users with `user_type: "accountant"` can access this.
+**Description:** Retrieve or update the authenticated user's accountant profile. Only users with `user_type: "accountant"` can access this endpoint. The profile is automatically created when the user registers.
 
-**Request Body:**
+**Request Body (PUT/PATCH):**
 
 ```json
 {
-  "bio": "Experienced CPA with 10+ years...",
-  "profile_picture_url": "https://example.com/profile.jpg",
-  "specializations": ["Tax Planning", "Financial Consulting", "Audit"],
-  "certifications": ["CPA", "CMA", "CIA"],
-  "years_of_experience": 10,
+  "profile_picture": "image_file",
+  "phone": "+1234567890",
+  "location": "Algiers, Algeria",
+  "bio": "Experienced CPA with 10+ years in tax preparation and financial consulting...",
   "working_hours": {
     "monday": { "start": "09:00", "end": "17:00" },
     "tuesday": { "start": "09:00", "end": "17:00" },
@@ -428,46 +429,174 @@ https://my-accountant-j02f.onrender.com
     "saturday": "closed",
     "sunday": "closed"
   },
-  "contact_preferences": {
-    "email": true,
-    "phone": true,
-    "video_call": true,
-    "in_person": false
-  }
+  "attachments": "certification_file.pdf",
+  "is_available": true
 }
 ```
 
-**Response (Success - 201):**
+**Response (Success - 200):**
 
 ```json
 {
   "profile_id": "uuid-here",
+  "user": {
+    "pk": "uuid-here",
+    "email": "accountant@example.com",
+    "full_name": "Jane Smith",
+    "user_type": "accountant",
+    "phone": "+1234567890",
+    "is_email_verified": true,
+    "account_status": "active",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
+  },
+  "profile_picture": "https://example.com/profile.jpg",
+  "phone": "+1234567890",
+  "location": "Algiers, Algeria",
   "bio": "Experienced CPA with 10+ years...",
-  "profile_picture_url": "https://example.com/profile.jpg",
-  "specializations": ["Tax Planning", "Financial Consulting", "Audit"],
-  "certifications": ["CPA", "CMA", "CIA"],
-  "years_of_experience": 10,
-  "working_hours": {...},
-  "contact_preferences": {...},
-  "is_verified": false,
-  "overall_rating": 0.0,
-  "total_completed_sessions": 0,
-  "total_reviews_count": 0,
+  "working_hours": {
+    "monday": { "start": "09:00", "end": "17:00" },
+    "tuesday": { "start": "09:00", "end": "17:00" },
+    "wednesday": { "start": "09:00", "end": "17:00" },
+    "thursday": { "start": "09:00", "end": "17:00" },
+    "friday": { "start": "09:00", "end": "17:00" },
+    "saturday": "closed",
+    "sunday": "closed"
+  },
+  "attachments": "https://example.com/certification_file.pdf",
+  "all_services": [
+    {
+      "id": "uuid-here",
+      "service_type": "offered",
+      "title": "Tax Declaration Preparation",
+      "description": "Professional tax filing services...",
+      "categories": [...],
+      "price": "8000.00",
+      "location": "16",
+      "delivery_method": "online",
+      "is_featured": false,
+      "created_at": "2025-01-01T12:00:00Z"
+    }
+  ],
+  "is_available": true,
   "created_at": "2025-01-01T12:00:00Z",
   "updated_at": "2025-01-01T12:00:00Z"
 }
 ```
 
-#### Get/Update Accountant Profile 🔒
+#### Retrieve/Update Client Profile 🔒
 
-**Endpoint:** `GET/PUT/PATCH /profiles/accountant/`
+**Endpoint:** `GET/PUT/PATCH /profiles/client/`
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Retrieves or updates the current user's accountant profile.
+**Description:** Retrieve or update the authenticated user's client profile. Only users with `user_type: "client"` can access this endpoint. The profile is automatically created when the user registers.
 
-**Response (GET - 200):** Same as create response
-**Request/Response (PUT/PATCH):** Same as create
+**Request Body (PUT/PATCH):**
+
+```json
+{
+  "profile_picture": "image_file",
+  "phone": "+1234567890",
+  "location": "Oran, Algeria",
+  "activity_type": "Food Distribution Company",
+  "attachments": "company_documents.pdf"
+}
+```
+
+**Response (Success - 200):**
+
+```json
+{
+  "profile_id": "uuid-here",
+  "user": {
+    "pk": "uuid-here",
+    "email": "client@example.com",
+    "full_name": "Company Name",
+    "user_type": "client",
+    "phone": "+1234567890",
+    "is_email_verified": true,
+    "account_status": "active",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
+  },
+  "profile_picture": "https://example.com/profile.jpg",
+  "phone": "+1234567890",
+  "location": "Oran, Algeria",
+  "activity_type": "Food Distribution Company",
+  "attachments": "https://example.com/company_documents.pdf",
+  "all_services": [
+    {
+      "id": "uuid-here",
+      "service_type": "needed",
+      "title": "Need Tax Declaration Help",
+      "description": "Looking for professional accountant...",
+      "categories": [...],
+      "price": "5000.00",
+      "location": "31",
+      "delivery_method": "online",
+      "is_featured": false,
+      "created_at": "2025-01-01T12:00:00Z"
+    }
+  ],
+  "created_at": "2025-01-01T12:00:00Z",
+  "updated_at": "2025-01-01T12:00:00Z"
+}
+```
+
+#### Retrieve/Update Academic Profile 🔒
+
+**Endpoint:** `GET/PUT/PATCH /profiles/academic/`
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Retrieve or update the authenticated user's academic profile. Only users with `user_type: "academic"` can access this endpoint. The profile is automatically created when the user registers.
+
+**Request Body (PUT/PATCH):**
+
+```json
+{
+  "profile_picture": "image_file",
+  "phone": "+1234567890",
+  "bio": "Professor of Accounting at University...",
+  "attachments": "academic_credentials.pdf"
+}
+```
+
+**Response (Success - 200):**
+
+```json
+{
+  "profile_id": "uuid-here",
+  "user": {
+    "pk": "uuid-here",
+    "email": "academic@example.com",
+    "full_name": "Dr. Academic Name",
+    "user_type": "academic",
+    "phone": "+1234567890",
+    "is_email_verified": true,
+    "account_status": "active",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
+  },
+  "profile_picture": "https://example.com/profile.jpg",
+  "phone": "+1234567890",
+  "bio": "Professor of Accounting at University...",
+  "attachments": "https://example.com/academic_credentials.pdf",
+  "created_at": "2025-01-01T12:00:00Z",
+  "updated_at": "2025-01-01T12:00:00Z"
+}
+```
+
+**Key Features:**
+
+- **Automatic Profile Creation**: Profiles are created automatically via Django signals when users register
+- **Role-Based Access**: Each user type can only access their corresponding profile endpoint
+- **Service Integration**: Accountant and Client profiles include an `all_services` field showing all active services created by the user
+- **File Handling**: Profile pictures and attachments are properly handled with full URLs in responses
+- **Read-Only Fields**: `profile_id`, `user`, `created_at`, and `updated_at` are automatically managed
+
+````
 
 ---
 
@@ -486,7 +615,7 @@ The Services Management system allows clients to post service requests and accou
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Retrieves a list of all active predefined service categories for dropdown/selection lists. These categories are managed by administrators and users cannot create custom categories.
+**Description:** Retrieves a list of all active service categories for dropdown/selection lists. These categories are managed by administrators.
 
 **Response (Success - 200):**
 
@@ -507,7 +636,7 @@ The Services Management system allows clients to post service requests and accou
     "updated_at": "2025-01-01T12:00:00Z"
   }
 ]
-```
+````
 
 #### Get Category Details 🔒
 
@@ -542,7 +671,7 @@ Authorization: Bearer <access_token>
 Content-Type: multipart/form-data
 ```
 
-**Description:** Creates a new service. The service type is automatically determined based on user role:
+**Description:** Creates a new service with support for multiple file attachments. The service type is automatically determined based on user role:
 
 - **Clients** create `service_type: "needed"` (service requests)
 - **Accountants** create `service_type: "offered"` (service offerings)
@@ -553,43 +682,50 @@ Content-Type: multipart/form-data
 
 ```json
 {
-  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
-  "description": "أوفر خدمة إعداد وتقديم التصريحات الجبائية الشهرية للشركات والتجار بما في ذلك:\n• تصريح الضريبة على الدخل الإجمالي (IRG)\n• الضريبة على القيمة المضافة (TVA)\n• الضريبة على أرباح الشركات (IBS)\nأقوم بتحليل الوثائق، حساب القيم المستحقة، وملء التصاريح وفقاً للقوانين الجبائية الجزائرية.",
+  "title": "Tax Declaration Preparation (IRG, TVA, IBS)",
+  "description": "I offer monthly tax declaration preparation services for companies and traders including:\n• Individual Income Tax (IRG)\n• Value Added Tax (TVA)\n• Corporate Income Tax (IBS)\nI analyze documents, calculate due amounts, and fill declarations according to Algerian tax laws.",
   "categories": ["uuid1", "uuid2"],
   "location": "16",
   "estimated_duration": 2,
   "duration_unit": "days",
-  "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "estimated_duration_description": "2 to 4 days depending on business size and available documents",
   "price": 8000,
-  "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
+  "price_description": "Starting from 8000 DZD - Price negotiable based on file size",
   "delivery_method": "online",
-  "attachments": "tax_declaration_sample.pdf"
+  "upload_files": [file1, file2, file3]
 }
 ```
+
+**Multiple File Upload:**
+
+- Use `upload_files` field with multiple files
+- In Postman: Add multiple `upload_files` fields of type "File"
+- In form-data: Use the same key `upload_files` multiple times
+- Supported formats: PDF, DOC, DOCX, images, etc.
 
 **Example for Clients (Requesting Services):**
 
 ```json
 {
-  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
-  "description": "نحن شركة توزيع مواد غذائية مقرها في ولاية وهران نبحث عن محاسب معتمد للقيام بإعداد وتقديم التصريحات الجبائية الخاصة بنا (IRG, TVA, IBS) بشكل دوري",
+  "title": "Need Tax Declaration Preparation (IRG, TVA, IBS)",
+  "description": "We are a food distribution company based in Oran looking for a certified accountant to prepare and submit our monthly tax declarations (IRG, TVA, IBS) on a regular basis",
   "categories": ["uuid1"],
   "location": "31",
   "tasks_and_responsibilities": [
-    "جمع وتحليل الوثائق المالية",
-    "إعداد التصريحات الضريبية"
+    "Collect and analyze financial documents",
+    "Prepare tax declarations"
   ],
   "conditions_requirements": [
-    "محاسب معتمد أو خبير محاسبي",
-    "الالتزام بالسرية والحذر المهني"
+    "Certified accountant or accounting expert",
+    "Commitment to confidentiality and professional care"
   ],
   "estimated_duration": 1,
   "duration_unit": "weeks",
-  "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "estimated_duration_description": "2 to 4 days depending on business size and available documents",
   "price": 8000,
-  "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
+  "price_description": "Starting from 8000 DZD - Price negotiable based on file size",
   "delivery_method": "online",
-  "attachments": "company_documents.pdf"
+  "upload_files": [company_docs.pdf, business_license.jpg]
 }
 ```
 
@@ -603,33 +739,45 @@ Content-Type: multipart/form-data
   "user": {
     "pk": "uuid-here",
     "email": "accountant@example.com",
-    "full_name": "الأستاذ عبد القادر بن يوسف",
+    "full_name": "Mr. Abdelkader Ben Youssef",
     "user_type": "accountant"
   },
   "service_type": "offered",
-  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
-  "description": "أوفر خدمة إعداد وتقديم التصريحات الجبائية الشهرية للشركات والتجار بما في ذلك:\n• تصريح الضريبة على الدخل الإجمالي (IRG)\n• الضريبة على القيمة المضافة (TVA)\n• الضريبة على أرباح الشركات (IBS)\nأقوم بتحليل الوثائق، حساب القيم المستحقة، وملء التصاريح وفقاً للقوانين الجبائية الجزائرية.",
+  "title": "Tax Declaration Preparation (IRG, TVA, IBS)",
+  "description": "I offer monthly tax declaration preparation services...",
   "categories": [
     {
       "id": "uuid-here",
-      "name": "التصريحات الجبائية"
+      "name": "Tax Declarations"
     },
     {
       "id": "uuid-here",
-      "name": "الامتثال الجبائي والقانوني"
+      "name": "Tax and Legal Compliance"
     }
   ],
   "location": "16",
   "estimated_duration": 2,
   "duration_unit": "days",
-  "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "estimated_duration_description": "2 to 4 days depending on business size and available documents",
   "price": "8000.00",
-  "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
+  "price_description": "Starting from 8000 DZD - Price negotiable based on file size",
   "delivery_method": "online",
-  "attachments": {
-    "url": "https://example.com/tax_declaration_sample.pdf",
-    "filename": "نموذج تصريح جبائي سابق.pdf"
-  },
+  "all_attachments": [
+    {
+      "id": "485213c3-de3d-4cc1-95f0-9da5b83ea5dc",
+      "url": "/media/service_attachments/Database_Schema_Documentation.pdf",
+      "filename": "Database Schema Documentation.pdf",
+      "size": 53440,
+      "uploaded_at": "2025-09-18T09:10:54.461274Z"
+    },
+    {
+      "id": "ed499537-fcf4-4c34-9b81-5b7799f9838a",
+      "url": "/media/service_attachments/Not_named_yet.pdf",
+      "filename": "Not_named_yet.pdf",
+      "size": 106172,
+      "uploaded_at": "2025-09-18T09:10:54.461274Z"
+    }
+  ],
   "is_active": true,
   "is_featured": false,
   "created_at": "2025-01-01T12:00:00Z"
@@ -644,42 +792,54 @@ Content-Type: multipart/form-data
   "user": {
     "pk": "uuid-here",
     "email": "client@example.com",
-    "full_name": "اسم الشركة",
+    "full_name": "Company Name",
     "user_type": "client"
   },
   "service_type": "needed",
-  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
-  "description": "نحن شركة توزيع مواد غذائية مقرها في ولاية وهران نبحث عن محاسب معتمد للقيام بإعداد وتقديم التصريحات الجبائية الخاصة بنا (IRG, TVA, IBS) بشكل دوري",
+  "title": "Need Tax Declaration Preparation (IRG, TVA, IBS)",
+  "description": "We are a food distribution company based in Oran...",
   "categories": [
     {
       "id": "uuid-here",
-      "name": "التصريحات الجبائية"
+      "name": "Tax Declarations"
     }
   ],
   "location": "31",
   "tasks_and_responsibilities": [
-    "جمع وتحليل الوثائق المالية",
-    "إعداد التصريحات الضريبية"
+    "Collect and analyze financial documents",
+    "Prepare tax declarations"
   ],
   "conditions_requirements": [
-    "محاسب معتمد أو خبير محاسبي",
-    "الالتزام بالسرية والحذر المهني"
+    "Certified accountant or accounting expert",
+    "Commitment to confidentiality and professional care"
   ],
   "estimated_duration": 1,
   "duration_unit": "weeks",
-  "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "estimated_duration_description": "2 to 4 days depending on business size and available documents",
   "price": "8000.00",
-  "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
+  "price_description": "Starting from 8000 DZD - Price negotiable based on file size",
   "delivery_method": "online",
-  "attachments": {
-    "url": "https://example.com/company_documents.pdf",
-    "filename": "نسخة من دفتري كمحاسب معتمد.pdf"
-  },
+  "all_attachments": [
+    {
+      "id": "uuid-here",
+      "url": "/media/service_attachments/company_documents.pdf",
+      "filename": "Company Registration Documents.pdf",
+      "size": 245760,
+      "uploaded_at": "2025-01-01T12:00:00Z"
+    }
+  ],
   "is_active": true,
   "is_featured": false,
   "created_at": "2025-01-01T12:00:00Z"
 }
 ```
+
+**New Attachment System Features:**
+
+- ✅ **Multiple Files**: Upload multiple files per service using `upload_files` field
+- ✅ **File Metadata**: Each attachment includes `id`, `url`, `filename`, `size`, and `uploaded_at`
+- ✅ **Direct Downloads**: Files can be downloaded directly via their URLs
+- ✅ **Automatic Management**: Files are automatically linked to services and cleaned up on deletion
 
 ### 3. Service Management
 
@@ -706,19 +866,25 @@ Content-Type: multipart/form-data
     "service_type": "needed",
     "title": "Tax Filing for Small Business",
     "description": "Need help with annual tax filing...",
-    "category": {
-      "id": "uuid-here",
-      "name": "Tax Preparation"
-    },
+    "categories": [
+      {
+        "id": "uuid-here",
+        "name": "Tax Preparation"
+      }
+    ],
     "price": "500.00",
-    "price_negotiable": true,
-    "location_preference": "online",
-    "urgency_level": "medium",
+    "location": "16",
+    "delivery_method": "online",
     "is_featured": false,
+    "attachments_count": 3,
     "created_at": "2025-01-01T12:00:00Z"
   }
 ]
 ```
+
+**New Fields:**
+
+- `attachments_count`: Total number of files attached to the service
 
 #### Get Service Details 🔒
 
@@ -726,7 +892,7 @@ Content-Type: multipart/form-data
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Retrieves detailed information about a specific service owned by the user. The response fields are customized based on the service type:
+**Description:** Retrieves detailed information about a specific service owned by the user. The response fields are customized based on the service type and user role:
 
 - **"offered" services**: Show service details (price, duration, delivery method)
 - **"needed" services**: Show request details (tasks, conditions, requirements)
@@ -760,10 +926,22 @@ Content-Type: multipart/form-data
   "estimated_duration_description": "من 2 إلى 4 أيام حسب حجم النشاط والوثائق المتوفرة",
   "location": "16",
   "delivery_method": "online",
-  "attachments": {
-    "url": "https://example.com/tax_declaration_sample.pdf",
-    "filename": "نموذج تصريح جبائي سابق.pdf"
-  },
+  "all_attachments": [
+    {
+      "id": "uuid-here",
+      "url": "/media/service_attachments/tax_declaration_sample.pdf",
+      "filename": "نموذج تصريح جبائي سابق.pdf",
+      "size": 245760,
+      "uploaded_at": "2025-01-01T12:00:00Z"
+    },
+    {
+      "id": "uuid-here",
+      "url": "/media/service_attachments/certificate.pdf",
+      "filename": "شهادة الخبرة المحاسبية.pdf",
+      "size": 134567,
+      "uploaded_at": "2025-01-01T12:00:00Z"
+    }
+  ],
   "is_active": true,
   "is_featured": false,
   "created_at": "2025-01-01T12:00:00Z",
@@ -806,10 +984,15 @@ Content-Type: multipart/form-data
   "price_description": "ابتداء من 8000 دج - السعر قابل للتفاوض حسب حجم الملف",
   "location": "31",
   "delivery_method": "online",
-  "attachments": {
-    "url": "https://example.com/company_documents.pdf",
-    "filename": "نسخة من دفتري كمحاسب معتمد.pdf"
-  },
+  "all_attachments": [
+    {
+      "id": "uuid-here",
+      "url": "/media/service_attachments/company_documents.pdf",
+      "filename": "نسخة من دفتري كمحاسب معتمد.pdf",
+      "size": 512000,
+      "uploaded_at": "2025-01-01T12:00:00Z"
+    }
+  ],
   "is_active": true,
   "is_featured": false,
   "created_at": "2025-01-01T12:00:00Z",
@@ -833,43 +1016,16 @@ Content-Type: multipart/form-data
 
 **Request Body (PATCH example):**
 
-**Accountant Update Example:**
-
 ```json
 {
-  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
-  "description": "خدمة محدثة: أوفر خدمة إعداد وتقديم التصريحات الجبائية الشهرية مع متابعة إضافية",
-  "estimated_duration": 3,
-  "estimated_duration_description": "من 2 إلى 5 أيام حسب حجم النشاط والوثائق المتوفرة",
+  "title": "Updated Tax Declaration Preparation",
+  "description": "Updated service description...",
   "price": 9000,
-  "price_description": "ابتداء من 9000 دج - السعر محدث ويشمل خدمات إضافية",
-  "delivery_method": "online"
+  "price_description": "Updated pricing starting from 9000 DZD"
 }
 ```
 
-**Client Update Example:**
-
-````json
-{
-  "title": "إعداد التصريح الجبائي الشهري (IRG, TVA, IBS)",
-  "description": "تحديث: نحن شركة توزيع مواد غذائية نبحث عن محاسب معتمد مع خبرة إضافية في النظام الجبائي الجديد",
-  "tasks_and_responsibilities": [
-    "جمع وتحليل الوثائق المالية",
-    "إعداد التصريحات الضريبية",
-    "تقديم الاستشارة حول النظام الجبائي الجديد"
-  ],
-  "conditions_requirements": [
-    "محاسب معتمد أو خبير محاسبي",
-    "خبرة في النظام الجبائي الجديد",
-    "الالتزام بالسرية والحذر المهني"
-  ],
-  "estimated_duration": 2,
-  "duration_unit": "weeks",
-  "price": 9500,
-  "price_description": "ابتداء من 9500 دج - السعر محدث يشمل الاستشارة الإضافية",
-  "delivery_method": "online"
-}
-```**Response (Success - 200):** Updated service object
+**Response (Success - 200):** Updated service object
 
 #### Delete Service 🔒
 
@@ -896,16 +1052,12 @@ Content-Type: multipart/form-data
 
 **Query Parameters:**
 
-````
-
+```
 ?search=tax filing
-&category=uuid-here
-&location_preference=online,flexible
-&experience_level_required=intermediate,expert
-&urgency_level=high,urgent
+&categories=uuid-here
+&location=16,31
 &min_price=100
 &max_price=1000
-&price_negotiable=true
 &duration_unit=days,weeks
 &min_duration=1
 &max_duration=30
@@ -914,59 +1066,36 @@ Content-Type: multipart/form-data
 &created_before=2025-12-31
 &ordering=-created_at
 &page=1
-
 ```
 
 **Available Filters:**
 
-| Filter                      | Type       | Description                                                            | Options                                                               |
-| --------------------------- | ---------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `search`                    | String     | Search across title, description, skills, user name, company, category | Free text                                                             |
-| `category`                  | UUID Array | Filter by service categories                                           | Category UUIDs                                                        |
-| `location_preference`       | Array      | Meeting location preferences                                           | `online`, `client_office`, `my_office`, `flexible`, `to_be_discussed` |
-| `experience_level_required` | Array      | Required experience levels                                             | `beginner`, `intermediate`, `expert`, `any`                           |
-| `urgency_level`             | Array      | Service urgency levels                                                 | `low`, `medium`, `high`, `urgent`                                     |
-| `min_price`                 | Number     | Minimum price filter                                                   | Decimal value                                                         |
-| `max_price`                 | Number     | Maximum price filter                                                   | Decimal value                                                         |
-| `price_negotiable`          | Boolean    | Show only negotiable prices                                            | `true`, `false`                                                       |
-| `duration_unit`             | Array      | Time unit for estimated duration                                       | `hours`, `days`, `weeks`, `months`                                    |
-| `min_duration`              | Number     | Minimum estimated duration                                             | Integer value                                                         |
-| `max_duration`              | Number     | Maximum estimated duration                                             | Integer value                                                         |
-| `is_featured`               | Boolean    | Show only featured services                                            | `true`, `false`                                                       |
-| `created_after`             | Date       | Services created after date                                            | YYYY-MM-DD                                                            |
-| `created_before`            | Date       | Services created before date                                           | YYYY-MM-DD                                                            |
+| Filter           | Type       | Description                                 | Options                            |
+| ---------------- | ---------- | ------------------------------------------- | ---------------------------------- |
+| `search`         | String     | Search across title, description, user name | Free text                          |
+| `categories`     | UUID Array | Filter by service categories                | Category UUIDs                     |
+| `location`       | Array      | Filter by Algerian wilaya (state)           | Wilaya codes (01-58)               |
+| `min_price`      | Number     | Minimum price filter                        | Decimal value                      |
+| `max_price`      | Number     | Maximum price filter                        | Decimal value                      |
+| `duration_unit`  | Array      | Time unit for estimated duration            | `hours`, `days`, `weeks`, `months` |
+| `min_duration`   | Number     | Minimum estimated duration                  | Integer value                      |
+| `max_duration`   | Number     | Maximum estimated duration                  | Integer value                      |
+| `is_featured`    | Boolean    | Show only featured services                 | `true`, `false`                    |
+| `created_after`  | Date       | Services created after date                 | YYYY-MM-DD                         |
+| `created_before` | Date       | Services created before date                | YYYY-MM-DD                         |
 
 **Search Fields:** The search parameter searches across:
 
 - Service title and description
-- Skills keywords and requirements notes
-- Service provider's full name and company name
-- Service category name
+- Service provider's full name
+- Location
+- Category names
 
 **Ordering Options:**
 
 - `created_at` (default: `-created_at` for newest first)
 - `price`
-- `urgency_level`
 - `estimated_duration`
-
-**Role-Based Examples:**
-
-**For Clients (sees offered services):**
-
-```
-
-GET /services/browse/?search=tax&urgency_level=high&max_price=500
-
-```
-
-**For Accountants (sees needed services):**
-
-```
-
-GET /services/browse/?search=bookkeeping&location_preference=online&min_price=200
-
-````
 
 **Response (Success - 200):**
 
@@ -987,20 +1116,21 @@ GET /services/browse/?search=bookkeeping&location_preference=online&min_price=20
       "service_type": "offered",
       "title": "Professional Tax Filing Service",
       "description": "I offer comprehensive tax filing services...",
-      "category": {
-        "id": "uuid-here",
-        "name": "Tax Preparation"
-      },
+      "categories": [
+        {
+          "id": "uuid-here",
+          "name": "Tax Preparation"
+        }
+      ],
       "price": "400.00",
-      "price_negotiable": false,
-      "location_preference": "online",
-      "urgency_level": "medium",
+      "location": "16",
+      "delivery_method": "online",
       "is_featured": true,
       "created_at": "2025-01-01T12:00:00Z"
     }
   ]
 }
-````
+```
 
 #### View Service Details 🔒
 
@@ -1013,16 +1143,11 @@ GET /services/browse/?search=bookkeeping&location_preference=online&min_price=20
 - **"offered" services** (accountant services): Show service details like price, duration, delivery method
 - **"needed" services** (client requests): Show request details like tasks, conditions, requirements
 
-This means:
-
-- Anyone viewing an accountant's offered service sees the service details format
-- Anyone viewing a client's needed service sees the request details format
-
 **Response (Success - 200):** Role-specific service object (same format as "Get Service Details" above)
 
 ---
 
-## Bookings Management
+## 10. Bookings Management
 
 ### 1. Booking Creation
 
@@ -1117,6 +1242,18 @@ This means:
 [
   {
     "booking_id": "uuid-here",
+    "client": {
+      "pk": "uuid-here",
+      "email": "client@example.com",
+      "full_name": "John Doe",
+      "user_type": "client"
+    },
+    "accountant": {
+      "pk": "uuid-here",
+      "email": "accountant@example.com",
+      "full_name": "Jane Smith",
+      "user_type": "accountant"
+    },
     "service": {
       "id": "uuid-here",
       "title": "Professional Tax Filing Service",
@@ -1126,6 +1263,7 @@ This means:
     "scheduled_end": "2025-02-01T12:00:00Z",
     "status": "confirmed",
     "meeting_type": "online",
+    "agreed_price": "400.00",
     "created_at": "2025-01-01T12:00:00Z"
   }
 ]
@@ -1161,10 +1299,12 @@ This means:
     "title": "Professional Tax Filing Service",
     "description": "Comprehensive tax filing services...",
     "service_type": "offered",
-    "category": {
-      "id": "uuid-here",
-      "name": "Tax Preparation"
-    }
+    "categories": [
+      {
+        "id": "uuid-here",
+        "name": "Tax Preparation"
+      }
+    ]
   },
   "proposal_message": "I can help you with your tax filing...",
   "scheduled_start": "2025-02-01T10:00:00Z",
@@ -1272,9 +1412,11 @@ This means:
 ### Registration Flow
 
 1. User registers → Account created (inactive, no email sent automatically)
+   - **Profile automatically created** based on `user_type` via Django signals
+   - AccountantProfile for accountants, ClientProfile for clients, AcademicProfile for academics
 2. User calls `/auth/send-email-otp/` → OTP sent to email
 3. User calls `/auth/verify-email-otp/` with OTP → Account activated
-4. User can now login
+4. User can now login and access their profile endpoint
 
 ### Social Authentication Flow
 
@@ -1317,49 +1459,39 @@ This means:
    - Retry original API call
 4. If refresh fails, redirect user to login
 
-### Accountant Profile Flow
+### Profile Management Flow
 
-1. User with `user_type: "accountant"` logs in successfully
-2. Check if profile exists: `GET /profiles/accountant/`
-3. If no profile exists:
-   - Show profile creation form
-   - Call `POST /profiles/accountant/create/`
-4. If profile exists:
-   - Allow updates via `PUT/PATCH /profiles/accountant/`
+**Automatic Profile Creation:**
+
+- Profiles are **automatically created** when users register using Django signals
+- No explicit profile creation endpoints needed
+- Profile type matches the user's `user_type` (accountant → AccountantProfile, client → ClientProfile, academic → AcademicProfile)
+
+**Profile Updates:**
+
+- **Accountants**: Update via `PUT/PATCH /profiles/accountant/`
+- **Clients**: Update via `PUT/PATCH /profiles/client/`
+- **Academics**: Update via `PUT/PATCH /profiles/academic/`
+
+**Profile Features:**
+
+- **Service Integration**: Accountant and Client profiles include `all_services` field showing user's active services
+- **File Handling**: Profile pictures and attachments return full URLs
+- **Role-Based Access**: Users can only access their own profile type endpoint
 
 ### Service Management Flow
 
 **Category Selection Flow:**
 
 1. **Get Categories**: Call `GET /services/categories/` to get all categories for dropdown
-2. **User Selects**: User picks a category from the list (shows `name`, uses `id`)
-3. **Create Service**: Use the selected category's `id` in the `category` field
-
-**Creating New Categories:**
-
-If the user needs a category that doesn't exist:
-
-1. **Skip Category Selection**: Don't provide the `category` field
-2. **Provide New Category**: Include `new_category_name` (required) and optionally `new_category_description`
-3. **Create Service**: The API will automatically create the new category and link it to the service
-
-**Example for New Category Creation:**
-
-```json
-{
-  "title": "Custom Accounting Service",
-  "description": "Special accounting service...",
-  "new_category_name": "Custom Financial Analysis",
-  "new_category_description": "Specialized financial analysis services",
-  "price": 600.0
-  // ... other service fields
-}
-```
+2. **User Selects**: User picks one or more categories from the list (shows `name`, uses `id`)
+3. **Create Service**: Use the selected category IDs in the `categories` field (array of UUIDs)
 
 **Role-Based Service Creation:**
 
 1. **Clients**: Create "needed" services (requesting help) → `POST /services/create/`
 2. **Accountants**: Create "offered" services (providing help) → `POST /services/create/`
+3. **Academic users**: Limited access to service marketplace
 
 **Service Discovery:**
 
@@ -1371,6 +1503,8 @@ If the user needs a category that doesn't exist:
 1. **All Users**: View own services → `GET /services/my/`
 2. **All Users**: Update own services → `PUT/PATCH /services/{service_id}/update/`
 3. **All Users**: Delete own services → `DELETE /services/{service_id}/delete/`
+4. **All Users**: Update own services → `PUT/PATCH /services/{service_id}/update/`
+5. **All Users**: Delete own services → `DELETE /services/{service_id}/delete/`
 
 ### Booking Flow
 
@@ -1413,11 +1547,10 @@ If the user needs a category that doesn't exist:
 
 ### User Types and Permissions
 
-- **client**: Can book services, create "needed" services, search for offered services
-- **accountant**: Can create "offered" services, search for needed services, respond to "needed" services
-- **academic**: Limited access (future features planned)
+- **client**: Can create "needed" services, book offered services, create client profile, search for accountants
+- **accountant**: Can create "offered" services, propose to needed services, create accountant profile, search for clients
+- **academic**: Can create academic profile, limited access to service marketplace
 - **admin**: Full platform access and management capabilities
-- **admin**: Administrative access to all platform features
 
 ---
 
@@ -1473,8 +1606,9 @@ https://my-accountant-j02f.onrender.com/
 
 - **Swagger UI**: `http://localhost:8000/swagger/` (dev) | `https://my-accountant-j02f.onrender.com/swagger/` (prod)
 - **ReDoc**: `http://localhost:8000/redoc/` (dev) | `https://my-accountant-j02f.onrender.com/redoc/` (prod)
+- **Default API Docs**: `http://localhost:8000/` (dev) | `https://my-accountant-j02f.onrender.com/` (prod) - redirects to Swagger UI
 
 ---
 
-_Last Updated: August 25, 2025_
+_Last Updated: September 13, 2025_
 _API Version: v1_

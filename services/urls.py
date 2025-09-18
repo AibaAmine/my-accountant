@@ -15,8 +15,7 @@ urlpatterns = [
     # Category endpoints
     path(
         "categories/", ServiceCategoryListAPIView.as_view(), name="category-list"
-    ),  # Default categories 
-    
+    ),  # Default categories
     path(
         "categories/<uuid:pk>/",
         ServiceCategoryDetailAPIView.as_view(),

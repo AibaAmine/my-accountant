@@ -1,13 +1,30 @@
 from rest_framework import serializers
-from .models import Service, ServiceCategory
+from .models import Service, ServiceCategory, ServiceAttachment
 from accounts.serializers import CustomUserDetailsSerializer
 from django.utils import timezone
 from .category_serializers import ServiceCategorySerializer
 
 
+class ServiceAttachmentSerializer(serializers.ModelSerializer):
+    """Serializer for individual service attachments"""
+
+    class Meta:
+        model = ServiceAttachment
+        fields = ["id", "file", "original_filename", "file_size", "uploaded_at"]
+        read_only_fields = ["id", "original_filename", "file_size", "uploaded_at"]
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.file:
+            representation["url"] = instance.file.url
+            representation["filename"] = instance.original_filename
+        return representation
+
+
 class ServiceListSerializer(serializers.ModelSerializer):
     categories = ServiceCategorySerializer(many=True, read_only=True)
     user = CustomUserDetailsSerializer(read_only=True)
+    attachments_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Service
@@ -23,19 +40,32 @@ class ServiceListSerializer(serializers.ModelSerializer):
             "location_description",
             "delivery_method",
             "is_featured",
+            "attachments_count",
             "created_at",
         ]
         read_only_fields = ("id", "created_at", "user", "updated_at", "service_type")
+
+    def get_attachments_count(self, obj):
+        """Return total number of attachments"""
+        count = obj.service_attachments.count()
+        if obj.attachments:  # Legacy attachment
+            count += 1
+        return count
 
 
 class ServiceDetailSerializer(serializers.ModelSerializer):
     user = CustomUserDetailsSerializer(read_only=True)
     categories = ServiceCategorySerializer(many=True, read_only=True)
+    all_attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = Service
         fields = "__all__"
         read_only_fields = ("id", "user", "created_at", "updated_at", "service_type")
+
+    def get_all_attachments(self, obj):
+        """Return all attachments including legacy and new ones"""
+        return obj.get_all_attachments()
 
 
 class AccountantServiceDetailSerializer(serializers.ModelSerializer):
@@ -43,6 +73,7 @@ class AccountantServiceDetailSerializer(serializers.ModelSerializer):
 
     user = CustomUserDetailsSerializer(read_only=True)
     categories = ServiceCategorySerializer(many=True, read_only=True)
+    all_attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = Service
@@ -60,7 +91,7 @@ class AccountantServiceDetailSerializer(serializers.ModelSerializer):
             "estimated_duration_description",
             "location",
             "delivery_method",
-            "attachments",
+            "all_attachments",
             "is_active",
             "is_featured",
             "created_at",
@@ -68,23 +99,9 @@ class AccountantServiceDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ("id", "user", "created_at", "updated_at", "service_type")
 
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-
-        # Handle attachments display
-        if instance.attachments:
-            representation["attachments"] = {
-                "url": instance.attachments.url,
-                "filename": (
-                    instance.attachments.name.split("/")[-1]
-                    if instance.attachments.name
-                    else "file"
-                ),
-            }
-        else:
-            representation["attachments"] = None
-
-        return representation
+    def get_all_attachments(self, obj):
+        """Return all attachments including legacy and new ones"""
+        return obj.get_all_attachments()
 
 
 class ClientServiceDetailSerializer(serializers.ModelSerializer):
@@ -92,6 +109,7 @@ class ClientServiceDetailSerializer(serializers.ModelSerializer):
 
     user = CustomUserDetailsSerializer(read_only=True)
     categories = ServiceCategorySerializer(many=True, read_only=True)
+    all_attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = Service
@@ -111,7 +129,7 @@ class ClientServiceDetailSerializer(serializers.ModelSerializer):
             "price_description",
             "location",
             "delivery_method",
-            "attachments",
+            "all_attachments",
             "is_active",
             "is_featured",
             "created_at",
@@ -119,28 +137,18 @@ class ClientServiceDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ("id", "user", "created_at", "updated_at", "service_type")
 
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-
-        # Handle attachments display
-        if instance.attachments:
-            representation["attachments"] = {
-                "url": instance.attachments.url,
-                "filename": (
-                    instance.attachments.name.split("/")[-1]
-                    if instance.attachments.name
-                    else "file"
-                ),
-            }
-        else:
-            representation["attachments"] = None
-
-        return representation
+    def get_all_attachments(self, obj):
+        """Return all attachments including legacy and new ones"""
+        return obj.get_all_attachments()
 
 
 class ServiceCreateSerializer(serializers.ModelSerializer):
     categories = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=True
+    )
+    # Accept multiple files for upload
+    upload_files = serializers.ListField(
+        child=serializers.FileField(), write_only=True, required=False
     )
 
     class Meta:
@@ -162,7 +170,7 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             "location",
             "location_description",
             "delivery_method",
-            "attachments",
+            "upload_files",  # New field for multiple files
             "created_at",
         ]
         read_only_fields = ("id", "created_at", "user", "service_type", "updated_at")
@@ -204,6 +212,7 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         categories = validated_data.pop("categories", [])
+        upload_files = validated_data.pop("upload_files", [])
 
         # Create the service first
         service = super().create(validated_data)
@@ -213,22 +222,17 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             existing_categories = ServiceCategory.objects.filter(id__in=categories)
             service.categories.add(*existing_categories)
 
+        # Handle multiple file uploads
+        if upload_files:
+            for file in upload_files:
+                ServiceAttachment.objects.create(
+                    service=service, file=file, original_filename=file.name
+                )
+
         return service
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-
-        if instance.attachments:
-            representation["attachments"] = {
-                "url": instance.attachments.url,
-                "filename": (
-                    instance.attachments.name.split("/")[-1]
-                    if instance.attachments.name
-                    else "file"
-                ),
-            }
-        else:
-            representation["attachments"] = None
 
         # Include the full categories objects in response
         if instance.categories.exists():
@@ -237,11 +241,23 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             ).data
         else:
             representation["categories"] = []
+
+        # Include all attachments (new system)
+        representation["all_attachments"] = instance.get_all_attachments()
+
         return representation
 
 
 class ServiceUpdateSerializer(serializers.ModelSerializer):
     categories = serializers.ListField(
+        child=serializers.UUIDField(), write_only=True, required=False
+    )
+    # Accept multiple files for upload
+    upload_files = serializers.ListField(
+        child=serializers.FileField(), write_only=True, required=False
+    )
+    # Option to remove specific attachments
+    remove_attachment_ids = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=False
     )
 
@@ -264,7 +280,8 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
             "location",
             "location_description",
             "delivery_method",
-            "attachments",
+            "upload_files",  # New field for multiple files
+            "remove_attachment_ids",  # IDs of attachments to remove
         ]
         read_only_fields = ("id", "user", "service_type", "created_at", "updated_at")
 
@@ -307,6 +324,8 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         categories = validated_data.pop("categories", None)
+        upload_files = validated_data.pop("upload_files", [])
+        remove_attachment_ids = validated_data.pop("remove_attachment_ids", [])
 
         # Update the service first
         service = super().update(instance, validated_data)
@@ -319,6 +338,19 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
                 existing_categories = ServiceCategory.objects.filter(id__in=categories)
                 service.categories.add(*existing_categories)
 
+        # Remove specified attachments
+        if remove_attachment_ids:
+            ServiceAttachment.objects.filter(
+                service=service, id__in=remove_attachment_ids
+            ).delete()
+
+        # Add new files
+        if upload_files:
+            for file in upload_files:
+                ServiceAttachment.objects.create(
+                    service=service, file=file, original_filename=file.name
+                )
+
         return service
 
     def to_representation(self, instance):
@@ -330,4 +362,8 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
             ).data
         else:
             representation["categories"] = []
+
+        # Include all attachments (new system)
+        representation["all_attachments"] = instance.get_all_attachments()
+
         return representation

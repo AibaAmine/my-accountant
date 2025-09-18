@@ -12,7 +12,7 @@ from .category_serializers import (
 )
 
 from rest_framework import generics
-from .models import Service, ServiceCategory
+from .models import Service, ServiceCategory, ServiceAttachment
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -28,6 +28,37 @@ class ServiceCreateAPIView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def create(self, request, *args, **kwargs):
+        if request.content_type and "multipart/form-data" in request.content_type:
+            data = {}
+
+            for key, value in request.data.items():
+                if key not in ["upload_files"]:
+                    data[key] = value
+
+            if "categories" in data and isinstance(data["categories"], str):
+                try:
+                    import json
+
+                    data["categories"] = json.loads(data["categories"])
+                except (json.JSONDecodeError, TypeError):
+                    data["categories"] = [data["categories"]]
+
+            upload_files = request.FILES.getlist("upload_files")
+            if upload_files:
+                data["upload_files"] = upload_files
+
+        else:
+            data = request.data
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
+
     def perform_create(self, serializer):
         user = self.request.user
         serializer.save(user=user)
@@ -40,12 +71,56 @@ class ServiceUpdateAPIView(generics.UpdateAPIView):
     queryset = Service.objects.all()
     lookup_field = "pk"
 
+    def update(self, request, *args, **kwargs):
+        # For form-data, we need to handle categories and files differently
+        if request.content_type and "multipart/form-data" in request.content_type:
+            # Create a mutable copy for form-data processing
+            data = {}
+
+            # Copy all text fields
+            for key, value in request.data.items():
+                if key not in ["upload_files", "remove_attachment_ids"]:
+                    data[key] = value
+
+            # Handle categories JSON parsing
+            if "categories" in data and isinstance(data["categories"], str):
+                try:
+                    import json
+
+                    data["categories"] = json.loads(data["categories"])
+                except (json.JSONDecodeError, TypeError):
+                    data["categories"] = [data["categories"]]
+
+            # Handle multiple files separately
+            upload_files = request.FILES.getlist("upload_files")
+            if upload_files:
+                data["upload_files"] = upload_files
+
+            # Handle removal list
+            remove_ids = request.data.getlist("remove_attachment_ids")
+            if remove_ids:
+                data["remove_attachment_ids"] = remove_ids
+
+        else:
+            # For JSON requests, use data as-is
+            data = request.data
+
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, "_prefetched_objects_cache", None):
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
     def get_queryset(self):
         return Service.objects.filter(user=self.request.user, is_active=True)
 
     def perform_update(self, serializer):
         user = self.request.user
-
         serializer.save(user=user)
 
 
@@ -83,14 +158,14 @@ class PublicServiceDetailAPIView(generics.RetrieveAPIView):
     lookup_field = "pk"
 
     def get_serializer_class(self):
-        
+
         service = self.get_object()
 
         if service.service_type == "offered":
-           
+
             return AccountantServiceDetailSerializer
         elif service.service_type == "needed":
-            
+
             return ClientServiceDetailSerializer
         return ServiceDetailSerializer
 

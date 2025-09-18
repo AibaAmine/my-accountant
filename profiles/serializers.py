@@ -1,31 +1,41 @@
 from rest_framework import serializers
 from .models import AccountantProfile, ClientProfile, AcademicProfile
+from accounts.serializers import CustomUserDetailsSerializer
 
 
 class AccountantProfileSerializer(serializers.ModelSerializer):
-    full_name = serializers.CharField(source="user.full_name", read_only=True)
+    user = CustomUserDetailsSerializer(read_only=True)
+    all_services = serializers.SerializerMethodField()
 
     class Meta:
         model = AccountantProfile
         fields = [
             "profile_id",
-            "full_name",
+            "user",
             "profile_picture",
             "phone",
             "location",
             "bio",
             "working_hours",
             "attachments",
+            "all_services",
             "is_available",
             "created_at",
             "updated_at",
         ]
         read_only_fields = [
             "profile_id",
-            "full_name",
+            "user",
             "created_at",
             "updated_at",
         ]
+
+    def get_all_services(self, obj):
+        """Get all services for this user"""
+        from services.serializers import ServiceSerializer
+
+        services = obj.user.services.filter(is_active=True)
+        return ServiceSerializer(services, many=True, context=self.context).data
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -41,27 +51,36 @@ class AccountantProfileSerializer(serializers.ModelSerializer):
 
 
 class ClientProfileSerializer(serializers.ModelSerializer):
-    full_name = serializers.CharField(source="user.full_name", read_only=True)
+    user = CustomUserDetailsSerializer(read_only=True)
+    all_services = serializers.SerializerMethodField()
 
     class Meta:
         model = ClientProfile
         fields = [
             "profile_id",
-            "full_name",
+            "user",
             "profile_picture",
             "phone",
             "location",
             "activity_type",
             "attachments",
+            "all_services",
             "created_at",
             "updated_at",
         ]
         read_only_fields = [
             "profile_id",
-            "full_name",
+            "user",
             "created_at",
             "updated_at",
         ]
+
+    def get_all_services(self, obj):
+        """Get all services for this user"""
+        from services.serializers import ServiceSerializer
+
+        services = obj.user.services.filter(is_active=True)
+        return ServiceSerializer(services, many=True, context=self.context).data
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -77,13 +96,13 @@ class ClientProfileSerializer(serializers.ModelSerializer):
 
 
 class AcademicProfileSerializer(serializers.ModelSerializer):
-    full_name = serializers.CharField(source="user.full_name", read_only=True)
+    user = CustomUserDetailsSerializer(read_only=True)
 
     class Meta:
         model = AcademicProfile
         fields = [
             "profile_id",
-            "full_name",
+            "user",
             "profile_picture",
             "phone",
             "bio",
@@ -93,7 +112,7 @@ class AcademicProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "profile_id",
-            "full_name",
+            "user",
             "created_at",
             "updated_at",
         ]
