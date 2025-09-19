@@ -69,10 +69,14 @@ class AccountantProfileSerializer(serializers.ModelSerializer):
         return ServiceListSerializer(services, many=True, context=self.context).data
 
     def get_all_attachments(self, obj):
-        return obj.get_all_attachments()
+        """Get all profile attachments using serializer with context"""
+        attachments = obj.profile_attachments.all()
+        return ProfileAttachmentSerializer(
+            attachments, many=True, context=self.context
+        ).data
 
     def get_attachments_count(self, obj):
-        return len(obj.get_all_attachments())
+        return obj.profile_attachments.count()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -130,10 +134,14 @@ class ClientProfileSerializer(serializers.ModelSerializer):
         return ServiceListSerializer(services, many=True, context=self.context).data
 
     def get_all_attachments(self, obj):
-        return obj.get_all_attachments()
+        """Get all profile attachments using serializer with context"""
+        attachments = obj.profile_attachments.all()
+        return ProfileAttachmentSerializer(
+            attachments, many=True, context=self.context
+        ).data
 
     def get_attachments_count(self, obj):
-        return len(obj.get_all_attachments())
+        return obj.profile_attachments.count()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -181,12 +189,14 @@ class AcademicProfileSerializer(serializers.ModelSerializer):
         ]
 
     def get_all_attachments(self, obj):
-        """Get all attachments including legacy and new attachments"""
-        return obj.get_all_attachments()
+        """Get all profile attachments using serializer with context"""
+        attachments = obj.profile_attachments.all()
+        return ProfileAttachmentSerializer(
+            attachments, many=True, context=self.context
+        ).data
 
     def get_attachments_count(self, obj):
-        """Get total count of all attachments"""
-        return len(obj.get_all_attachments())
+        return obj.profile_attachments.count()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

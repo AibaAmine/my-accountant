@@ -6,19 +6,22 @@ from .category_serializers import ServiceCategorySerializer
 
 
 class ServiceAttachmentSerializer(serializers.ModelSerializer):
-    """Serializer for individual service attachments"""
+    """Serializer for service attachments"""
+
+    url = serializers.SerializerMethodField()
+    filename = serializers.CharField(source="original_filename", read_only=True)
+    size = serializers.IntegerField(source="file_size", read_only=True)
 
     class Meta:
         model = ServiceAttachment
-        fields = ["id", "file", "original_filename", "file_size", "uploaded_at"]
-        read_only_fields = ["id", "original_filename", "file_size", "uploaded_at"]
+        fields = ["id", "url", "filename", "size", "uploaded_at"]
+        read_only_fields = ["id", "uploaded_at"]
 
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        if instance.file:
-            representation["url"] = instance.file.url
-            representation["filename"] = instance.original_filename
-        return representation
+    def get_url(self, obj):
+        request = self.context.get("request")
+        if obj.file and request:
+            return request.build_absolute_uri(obj.file.url)
+        return obj.file.url if obj.file else None
 
 
 class ServiceListSerializer(serializers.ModelSerializer):
@@ -61,8 +64,11 @@ class ServiceDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "user", "created_at", "updated_at", "service_type")
 
     def get_all_attachments(self, obj):
-        """Return all attachments including legacy and new ones"""
-        return obj.get_all_attachments()
+        """Return all service attachments using ServiceAttachmentSerializer"""
+        attachments = obj.service_attachments.all()
+        return ServiceAttachmentSerializer(
+            attachments, many=True, context=self.context
+        ).data
 
 
 class AccountantServiceDetailSerializer(serializers.ModelSerializer):
@@ -97,8 +103,11 @@ class AccountantServiceDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "user", "created_at", "updated_at", "service_type")
 
     def get_all_attachments(self, obj):
-        """Return all attachments including legacy and new ones"""
-        return obj.get_all_attachments()
+        """Return all service attachments using ServiceAttachmentSerializer"""
+        attachments = obj.service_attachments.all()
+        return ServiceAttachmentSerializer(
+            attachments, many=True, context=self.context
+        ).data
 
 
 class ClientServiceDetailSerializer(serializers.ModelSerializer):
@@ -135,8 +144,11 @@ class ClientServiceDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "user", "created_at", "updated_at", "service_type")
 
     def get_all_attachments(self, obj):
-        """Return all attachments including legacy and new ones"""
-        return obj.get_all_attachments()
+        """Return all service attachments using ServiceAttachmentSerializer"""
+        attachments = obj.service_attachments.all()
+        return ServiceAttachmentSerializer(
+            attachments, many=True, context=self.context
+        ).data
 
 
 class ServiceCreateSerializer(serializers.ModelSerializer):
@@ -240,7 +252,10 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             representation["categories"] = []
 
         # Include all attachments (new system)
-        representation["all_attachments"] = instance.get_all_attachments()
+        attachments = instance.service_attachments.all()
+        representation["all_attachments"] = ServiceAttachmentSerializer(
+            attachments, many=True, context=self.context
+        ).data
 
         return representation
 
@@ -353,6 +368,9 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
             representation["categories"] = []
 
         # Include all attachments (new system)
-        representation["all_attachments"] = instance.get_all_attachments()
+        attachments = instance.service_attachments.all()
+        representation["all_attachments"] = ServiceAttachmentSerializer(
+            attachments, many=True, context=self.context
+        ).data
 
         return representation

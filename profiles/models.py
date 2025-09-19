@@ -87,22 +87,6 @@ class AccountantProfile(models.Model):
     def __str__(self):
         return f"Accountant: {self.user.full_name}"
 
-    def get_all_attachments(self):
-        """Get all profile attachments"""
-        attachments = []
-
-        for attachment in self.profile_attachments.all():
-            new_attachment = {
-                "id": str(attachment.attachment_id),
-                "url": attachment.url,
-                "filename": attachment.filename,
-                "size": attachment.size,
-                "uploaded_at": attachment.uploaded_at,
-            }
-            attachments.append(new_attachment)
-
-        return attachments
-
 
 class ClientProfile(models.Model):
     profile_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -128,23 +112,6 @@ class ClientProfile(models.Model):
     def __str__(self):
         return f"Client: {self.user.full_name}"
 
-    def get_all_attachments(self):
-        """Get all profile attachments"""
-        attachments = []
-
-        # Add new attachments
-        for attachment in self.profile_attachments.all():
-            new_attachment = {
-                "id": str(attachment.attachment_id),
-                "url": attachment.url,
-                "filename": attachment.filename,
-                "size": attachment.size,
-                "uploaded_at": attachment.uploaded_at,
-            }
-            attachments.append(new_attachment)
-
-        return attachments
-
 
 class AcademicProfile(models.Model):
     profile_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -168,20 +135,3 @@ class AcademicProfile(models.Model):
 
     def __str__(self):
         return f"Academic: {self.user.full_name}"
-
-    def get_all_attachments(self):
-        """Get all profile attachments"""
-        attachments = []
-
-        # Add new attachments
-        for attachment in self.profile_attachments.all():
-            new_attachment = {
-                "id": str(attachment.attachment_id),
-                "url": attachment.url,
-                "filename": attachment.filename,
-                "size": attachment.size,
-                "uploaded_at": attachment.uploaded_at,
-            }
-            attachments.append(new_attachment)
-
-        return attachments

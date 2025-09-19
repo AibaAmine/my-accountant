@@ -217,21 +217,3 @@ class Service(models.Model):
     def get_categories_display(self):
         """Return comma-separated list of category names"""
         return ", ".join([cat.name for cat in self.categories.all()])
-
-    def get_all_attachments(self):
-        """Return all service attachments"""
-        attachments_list = []
-
-        # Add multiple attachments
-        for attachment in self.service_attachments.all():
-            attachments_list.append(
-                {
-                    "id": str(attachment.id),
-                    "url": attachment.file.url,
-                    "filename": attachment.original_filename,
-                    "size": attachment.file_size,
-                    "uploaded_at": attachment.uploaded_at,
-                }
-            )
-
-        return attachments_list
