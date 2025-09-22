@@ -18,36 +18,24 @@ class Booking(models.Model):
         on_delete=models.CASCADE,
         related_name="bookings",
     )
-    proposal_message = models.TextField(blank=True, null=True)
 
-    # Booking details
-    scheduled_start = models.DateTimeField(blank=True, null=True)
-    scheduled_end = models.DateTimeField(blank=True, null=True)
-    meeting_type = models.CharField(
-        max_length=50,
-        choices=[
-            ("online", "Online"),
-            ("in_person", "In Person"),
-            ("phone", "Phone"),
-        ],
-        default="online",
-        blank=True,
-        null=True,
+    # Form fields from screenshots
+    full_name = models.CharField(max_length=255, help_text="الاسم الكامل")
+    linkedin_url = models.URLField(blank=True, null=True, help_text="رابط لينكدان")
+    cv_file = models.FileField(
+        upload_to="booking_cvs/", blank=True, null=True, help_text="أضف السيرة الذاتية"
     )
+    additional_notes = models.TextField(blank=True, null=True, help_text="إضافات")
+
     status = models.CharField(
-        max_length=50,
+        max_length=20,
         choices=[
-            ("proposed", "Proposed"),  # initial for service_proposal
-            ("pending", "Pending"),  # initial for direct booking awaiting confirmation
-            ("confirmed", "Confirmed"),
-            ("in_progress", "In Progress"),
-            ("completed", "Completed"),
-            ("declined", "Declined"),
-            ("cancelled", "Cancelled"),
+            ("pending", "Pending"),  # Waiting for accept/decline
+            ("confirmed", "Confirmed"),  # Accepted - can start chat
+            ("declined", "Declined"),  # Declined
         ],
         default="pending",
     )
-    agreed_price = models.DecimalField(max_digits=10, decimal_places=2,blank=True,null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -55,7 +43,7 @@ class Booking(models.Model):
         db_table = "booking"
         verbose_name = "Booking"
         verbose_name_plural = "Bookings"
-        ordering = ["-scheduled_start"]
+        ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Booking {self.booking_id}: {self.client.username} with {self.accountant.username}"
+        return f"Booking {self.booking_id}: {self.client.full_name} with {self.accountant.full_name}"

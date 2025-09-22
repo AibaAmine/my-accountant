@@ -1460,6 +1460,721 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
 }
 ```
 
+---
+
+## 11. Chat System
+
+The Chat System provides real-time messaging capabilities between users with role-based access control. The system supports both group chat rooms and direct messaging (DM) with WebSocket connections for real-time communication.
+
+### 1. Chat System Overview
+
+#### System Features
+
+- **Real-time messaging** via WebSocket connections
+- **Role-based communication** with strict permission controls
+- **Group chat rooms** for multi-user conversations
+- **Direct messaging (DM)** for one-on-one conversations
+- **File sharing** support (images, documents, etc.)
+- **Message editing and deletion** capabilities
+- **Typing indicators** for real-time interaction feedback
+- **Online presence tracking** using Redis
+- **Unread message counts** and notification system
+- **Message history** with pagination
+- **Search functionality** across messages and users
+
+#### Role-Based Communication Rules
+
+**Communication Matrix:**
+
+| User Type      | Can Message Clients | Can Message Accountants | Can Message Academics | Can Create Group Rooms | Can Access Group Rooms |
+| -------------- | :-----------------: | :---------------------: | :-------------------: | :--------------------: | :--------------------: |
+| **Client**     |         ❌          |           ✅            |          ❌           |           ❌           |           ❌           |
+| **Accountant** |         ✅          |           ✅            |          ✅           |           ✅           |           ✅           |
+| **Academic**   |         ❌          |           ✅            |          ✅           |           ❌           |           ✅           |
+
+**Key Rules:**
+
+- **Clients**: Can only message accountants via direct messaging (no group room access)
+- **Accountants**: Full access to all chat features and can communicate with everyone
+- **Academics**: Can message accountants and other academics, access group rooms but cannot create them
+
+### 2. REST API Endpoints
+
+#### Available Users
+
+**Endpoint:** `GET /chat/available_users/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Get list of users that the authenticated user can message based on role permissions.
+
+**Query Parameters:**
+
+- `search`: Search by full name or email
+- `page`: Page number for pagination (20 users per page)
+
+**Response (Success - 200):**
+
+```json
+{
+  "count": 15,
+  "next": "https://api.example.com/chat/available_users/?page=2",
+  "previous": null,
+  "results": [
+    {
+      "pk": "uuid-here",
+      "email": "accountant@example.com",
+      "full_name": "Jane Smith",
+      "user_type": "accountant",
+      "is_email_verified": true,
+      "account_status": "active"
+    },
+    {
+      "pk": "uuid-here",
+      "email": "academic@example.com",
+      "full_name": "Dr. Academic Name",
+      "user_type": "academic",
+      "is_email_verified": true,
+      "account_status": "active"
+    }
+  ]
+}
+```
+
+#### Group Chat Rooms
+
+**Get Group Chat Rooms:**
+
+**Endpoint:** `GET /chat/chatrooms/group/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Get all group chat rooms that the authenticated user is a member of.
+
+**Response (Success - 200):**
+
+```json
+[
+  {
+    "room_id": "uuid-here",
+    "creator": {
+      "pk": "uuid-here",
+      "email": "accountant@example.com",
+      "full_name": "Jane Smith",
+      "user_type": "accountant"
+    },
+    "room_name": "General Discussion",
+    "created_at": "2025-01-01T12:00:00Z",
+    "description": "General discussion room for all accountants",
+    "is_private": false,
+    "is_dm": false,
+    "members_count": 5,
+    "message_count": 42,
+    "has_unread_messages": true
+  }
+]
+```
+
+**Create Group Chat Room:**
+
+**Endpoint:** `POST /chat/chatrooms/group/create/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Create a new group chat room. Only accountants can create group rooms.
+
+**Request Body:**
+
+```json
+{
+  "room_name": "Tax Preparation Discussion",
+  "description": "Discussion room for tax preparation topics",
+  "is_private": true
+}
+```
+
+**Response (Success - 201):**
+
+```json
+{
+  "room_id": "uuid-here",
+  "creator": {
+    "pk": "uuid-here",
+    "email": "accountant@example.com",
+    "full_name": "Jane Smith",
+    "user_type": "accountant"
+  },
+  "room_name": "Tax Preparation Discussion",
+  "created_at": "2025-01-01T12:00:00Z",
+  "description": "Discussion room for tax preparation topics",
+  "is_private": true,
+  "is_dm": false,
+  "members_count": 1,
+  "message_count": 0,
+  "has_unread_messages": false
+}
+```
+
+**Group Chat Room Details:**
+
+**Endpoint:** `GET/PUT/DELETE /chat/chatrooms/{room_id}/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Retrieve, update, or delete a specific group chat room.
+
+**Update Request Body (PUT):**
+
+```json
+{
+  "room_name": "Updated Room Name",
+  "description": "Updated room description",
+  "is_private": false
+}
+```
+
+#### Direct Message Rooms
+
+**Get Direct Message Rooms:**
+
+**Endpoint:** `GET /chat/chatrooms/direct/me/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Get all direct message rooms for the authenticated user.
+
+**Response (Success - 200):**
+
+```json
+[
+  {
+    "room_id": "uuid-here",
+    "creator": {
+      "pk": "uuid-here",
+      "email": "client@example.com",
+      "full_name": "John Doe",
+      "user_type": "client"
+    },
+    "room_name": "dm_uuid1_uuid2",
+    "created_at": "2025-01-01T12:00:00Z",
+    "description": "Direct message between John Doe and Jane Smith",
+    "is_private": true,
+    "is_dm": true,
+    "members_count": 2,
+    "message_count": 8,
+    "has_unread_messages": false
+  }
+]
+```
+
+**Create/Get Direct Message Room:**
+
+**Endpoint:** `POST /chat/chatrooms/direct/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Create or retrieve an existing direct message room between two users.
+
+**Request Body:**
+
+```json
+{
+  "target_user_id": "uuid-of-target-user"
+}
+```
+
+**Response (Success - 200):**
+
+```json
+{
+  "room_id": "uuid-here",
+  "creator": {
+    "pk": "uuid-here",
+    "email": "client@example.com",
+    "full_name": "John Doe",
+    "user_type": "client"
+  },
+  "room_name": "dm_uuid1_uuid2",
+  "created_at": "2025-01-01T12:00:00Z",
+  "description": "Direct message between John Doe and Jane Smith",
+  "is_private": true,
+  "is_dm": true,
+  "members_count": 2,
+  "message_count": 8,
+  "has_unread_messages": false
+}
+```
+
+#### Room Management
+
+**Add Member to Group Room:**
+
+**Endpoint:** `POST /chat/chatrooms/group/{room_id}/add_member/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Add a new member to a group chat room. Only room creators can add members.
+
+**Request Body:**
+
+```json
+{
+  "user_id": "uuid-of-user-to-add"
+}
+```
+
+**Response (Success - 200):**
+
+```json
+"User added successfully"
+```
+
+**Remove Member from Group Room:**
+
+**Endpoint:** `DELETE /chat/chatrooms/group/{room_id}/remove_member/{user_id_to_remove}/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Remove a member from a group chat room. Only room creators can remove members.
+
+**Response (Success - 200):**
+
+```json
+{
+  "room_id": "uuid-here",
+  "room_name": "Updated Room Name",
+  "members_count": 4,
+  "message_count": 15
+}
+```
+
+**Note:** Only room creators can add/remove members. Clients cannot be added to group rooms.
+
+#### Messages
+
+**Get Room Messages:**
+
+**Endpoint:** `GET /chat/chatrooms/{room_id}/messages/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Get messages from a specific chat room with pagination and search.
+
+**Query Parameters:**
+
+- `search`: Search message content
+- `page`: Page number (20 messages per page)
+
+**Response (Success - 200):**
+
+```json
+{
+  "count": 50,
+  "next": "https://api.example.com/chat/chatrooms/uuid/messages/?page=2",
+  "previous": null,
+  "results": [
+    {
+      "message_id": "uuid-here",
+      "room": {
+        "room_id": "uuid-here",
+        "room_name": "General Discussion"
+      },
+      "sender": {
+        "pk": "uuid-here",
+        "email": "user@example.com",
+        "full_name": "John Doe",
+        "user_type": "client"
+      },
+      "content": "Hello everyone!",
+      "timestamp": "2025-01-01T12:00:00Z",
+      "edited_at": null,
+      "is_deleted": false
+    }
+  ]
+}
+```
+
+**Update Message:**
+
+**Endpoint:** `PUT /chat/chatrooms/messages/{message_id}/update/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Update a message content. Only the message sender can edit their messages.
+
+**Request Body:**
+
+```json
+{
+  "content": "Updated message content"
+}
+```
+
+**Response (Success - 200):**
+
+```json
+{
+  "message_id": "uuid-here",
+  "content": "Updated message content",
+  "edited_at": "2025-01-01T12:05:00Z"
+}
+```
+
+**Delete Message:**
+
+**Endpoint:** `DELETE /chat/chatrooms/messages/{message_id}/delete/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Delete a message. Only the message sender can delete their messages. The message is soft-deleted and content becomes "This message has been deleted".
+
+**Response (Success - 204):** No content
+
+**Note:** Users can only edit/delete their own messages.
+
+#### File Upload
+
+**Endpoint:** `POST /chat/rooms/{room_id}/upload_file/` 🔒
+
+**Headers:**
+
+```
+Authorization: Bearer <access_token>
+Content-Type: multipart/form-data
+```
+
+**Description:** Upload a file to a chat room. The file will be broadcast to all room members via WebSocket.
+
+**Request Body (Form Data):**
+
+```
+file: [selected_file.jpg]
+```
+
+**Response (Success - 201):**
+
+```json
+{
+  "file_url": "/media/chat_files/uploaded_image.jpg"
+}
+```
+
+**Supported File Types:**
+
+- **Images**: JPG, PNG, GIF, WebP
+- **Documents**: PDF, DOC, DOCX, TXT
+- **Archives**: ZIP, RAR
+- **Audio**: MP3, WAV, M4A
+- **Video**: MP4, AVI, MOV
+
+#### Room Members
+
+**Get Room Members:**
+
+**Endpoint:** `GET /chat/chatrooms/{room_id}/members/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Get list of all members in a chat room.
+
+**Query Parameters:**
+
+- `search`: Search by full name
+- `page`: Page number (20 members per page)
+
+**Response (Success - 200):**
+
+```json
+{
+  "count": 5,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "pk": "uuid-here",
+      "email": "user@example.com",
+      "full_name": "John Doe",
+      "user_type": "accountant",
+      "is_email_verified": true,
+      "account_status": "active"
+    }
+  ]
+}
+```
+
+**Get Members Count:**
+
+**Endpoint:** `GET /chat/rooms/{room_id}/members/count/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Get the total count of members in a chat room.
+
+**Response (Success - 200):**
+
+```json
+{
+  "members_count": 5
+}
+```
+
+#### Notification Features
+
+**Get Unread Message Count:**
+
+**Endpoint:** `GET /chat/unread-count/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Get the total count of unread messages across all chat rooms for the authenticated user.
+
+**Response (Success - 200):**
+
+```json
+{
+  "unread_count": 12
+}
+```
+
+**Mark Room as Read:**
+
+**Endpoint:** `POST /chat/rooms/{room_id}/mark-read/` 🔒
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Mark all messages in a room as read by updating the user's last seen timestamp.
+
+**Response (Success - 200):**
+
+```json
+{
+  "message": "Last seen updated successfully"
+}
+```
+
+### 3. WebSocket Connection
+
+#### Connect to Chat Room
+
+**WebSocket URL:** `wss://my-accountant-j02f.onrender.com/ws/chat/{room_id}/`
+
+**Authentication:** JWT token required via WebSocket headers or query parameters
+
+**Connection Process:**
+
+1. **Authentication Check**: User must be authenticated via JWT
+2. **Room Membership Verification**: User must be a member of the specified room
+3. **Role-Based Access**: User's role must allow chat room access
+4. **Real-time Presence**: User is added to Redis presence tracking
+5. **Message History**: Last 50 messages are sent upon connection
+6. **User List**: Current online users in the room are broadcast
+
+**Connection Close Codes:**
+
+- **4000**: Room not found
+- **4001**: Unauthorized (invalid/missing JWT token)
+- **4003**: Forbidden access (not a room member or role restrictions)
+
+#### WebSocket Message Types
+
+**Sending Messages:**
+
+You can send the following message types to the WebSocket:
+
+**Text Message:**
+
+```json
+{
+  "type": "message",
+  "content": "Hello everyone!"
+}
+```
+
+**Typing Indicator:**
+
+```json
+{
+  "type": "typing",
+  "is_typing": true
+}
+```
+
+**Receiving Messages:**
+
+The WebSocket will send you the following message types:
+
+**Chat Message:**
+
+```json
+{
+  "type": "chat_message",
+  "message": "Hello everyone!",
+  "message_id": "uuid-here",
+  "sender_full_name": "John Doe",
+  "sender_id": "uuid-here",
+  "timestamp": "2025-01-01T12:00:00Z",
+  "edited_at": null,
+  "is_deleted": false
+}
+```
+
+**User Join Event:**
+
+```json
+{
+  "type": "user_join",
+  "user_id": "uuid-here",
+  "full_name": "Jane Smith"
+}
+```
+
+**User Leave Event:**
+
+```json
+{
+  "type": "user_leave",
+  "user_id": "uuid-here",
+  "user_full_name": "Jane Smith"
+}
+```
+
+**Typing Indicator:**
+
+```json
+{
+  "type": "typing_indicator",
+  "user": "Jane Smith",
+  "user_id": "uuid-here",
+  "room": "General Discussion",
+  "is_typing": true
+}
+```
+
+**Message Edited:**
+
+```json
+{
+  "type": "message_edited",
+  "message_id": "uuid-here",
+  "new_content": "Updated message content",
+  "edited_at": "2025-01-01T12:05:00Z",
+  "room_id": "uuid-here",
+  "sender_id": "uuid-here",
+  "sender_full_name": "John Doe"
+}
+```
+
+**Message Deleted:**
+
+```json
+{
+  "type": "message_deleted",
+  "message_id": "uuid-here",
+  "room_id": "uuid-here",
+  "edited_at": "2025-01-01T12:05:00Z"
+}
+```
+
+**Room Users List:**
+
+```json
+{
+  "type": "room_users_list",
+  "users": [
+    {
+      "id": "uuid-here",
+      "full_name": "John Doe"
+    },
+    {
+      "id": "uuid-here",
+      "full_name": "Jane Smith"
+    }
+  ]
+}
+```
+
+#### File Messages
+
+When a file is uploaded via the REST API, it's automatically broadcast to all room members via WebSocket as:
+
+```json
+{
+  "type": "chat_message",
+  "message_id": "uuid-here",
+  "message": "/media/chat_files/uploaded_image.jpg",
+  "sender_id": "uuid-here",
+  "sender_full_name": "John Doe",
+  "timestamp": "2025-01-01T12:00:00Z",
+  "message_type": "file"
+}
+```
+
+### 4. Error Handling
+
+#### REST API Errors
+
+**Permission Denied:**
+
+```json
+{
+  "detail": "You do not have permission to access this room."
+}
+```
+
+**Role Restrictions:**
+
+```json
+{
+  "error": "You cannot message this user"
+}
+```
+
+**Room Creation Limits:**
+
+```json
+{
+  "detail": "You cannot add a client to this room."
+}
+```
+
+**Message Not Found:**
+
+```json
+{
+  "detail": "Message not found or already deleted."
+}
+```
+
+#### WebSocket Error Handling
+
+**Connection Errors:**
+
+- **Code 4000**: Room not found - check if room_id exists
+- **Code 4001**: Unauthorized - verify JWT token is valid
+- **Code 4003**: Forbidden access - check room membership and user permissions
+
+**Runtime Errors:**
+
+```json
+{
+  "error": "Unauthorized to send messages."
+}
+```
+
+```json
+{
+  "error": "Message content is missing"
+}
+```
+
+```json
+{
+  "error": "Invalid JSON format received"
+}
+```
+
+---
+
 ## Error Codes and Messages
 
 ### Common HTTP Status Codes

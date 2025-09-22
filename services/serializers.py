@@ -367,7 +367,7 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
         else:
             representation["categories"] = []
 
-        # Include all attachments (new system)
+       
         attachments = instance.service_attachments.all()
         representation["all_attachments"] = ServiceAttachmentSerializer(
             attachments, many=True, context=self.context

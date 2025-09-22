@@ -25,7 +25,7 @@ ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]
 
 INSTALLED_APPS = [
     "daphne",
-    "django_extensions",  
+    "django_extensions",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -201,7 +201,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1")],
         },
     },
 }
