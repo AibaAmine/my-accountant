@@ -19,20 +19,17 @@ class Booking(models.Model):
         related_name="bookings",
     )
 
-    # Form fields from screenshots
-    full_name = models.CharField(max_length=255, help_text="الاسم الكامل")
-    linkedin_url = models.URLField(blank=True, null=True, help_text="رابط لينكدان")
-    cv_file = models.FileField(
-        upload_to="booking_cvs/", blank=True, null=True, help_text="أضف السيرة الذاتية"
-    )
-    additional_notes = models.TextField(blank=True, null=True, help_text="إضافات")
+    full_name = models.CharField(max_length=255)
+    linkedin_url = models.URLField(blank=True, null=True)
+    cv_file = models.FileField(upload_to="booking_cvs/", blank=True, null=True)
+    additional_notes = models.TextField(blank=True, null=True)
 
     status = models.CharField(
         max_length=20,
         choices=[
-            ("pending", "Pending"),  # Waiting for accept/decline
-            ("confirmed", "Confirmed"),  # Accepted - can start chat
-            ("declined", "Declined"),  # Declined
+            ("pending", "Pending"),  
+            ("confirmed", "Confirmed"),  
+            ("declined", "Declined"),  
         ],
         default="pending",
     )

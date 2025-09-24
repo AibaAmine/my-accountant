@@ -1,7 +1,7 @@
 from .views import (
     CreateBookingAPIView,
     UpdateBookingAPIView,
-    BookingListAPIView,
+    # BookingListAPIView,
     BookingDetailAPIView,
     AcceptBookingAPIView,
     DeclineBookingAPIView,
@@ -10,7 +10,7 @@ from .views import (
 from django.urls import path
 
 urlpatterns = [
-    path("bookings/", BookingListAPIView.as_view(), name="booking-list"),
+    # path("bookings/", BookingListAPIView.as_view(), name="booking-list"),
     path("bookings/create/", CreateBookingAPIView.as_view(), name="booking-create"),
     path(
         "bookings/<uuid:booking_id>/",

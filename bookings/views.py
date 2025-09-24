@@ -15,13 +15,12 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from .models import Booking
-from chat.utils import create_or_get_dm_room
 
 
 class CreateBookingAPIView(generics.CreateAPIView):
     serializer_class = BookingCreateSerializer
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]  # Handle file uploads
+    parser_classes = [MultiPartParser, FormParser]
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -32,7 +31,7 @@ class CreateBookingAPIView(generics.CreateAPIView):
 class UpdateBookingAPIView(generics.UpdateAPIView):
     serializer_class = BookingUpdateSerializer
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]  # Handle file uploads
+    parser_classes = [MultiPartParser, FormParser]
     lookup_field = "booking_id"
 
     def get_queryset(self):
@@ -47,24 +46,24 @@ class UpdateBookingAPIView(generics.UpdateAPIView):
         serializer.save()
 
 
-class BookingListAPIView(generics.ListAPIView):
-    serializer_class = BookingListSerializer
-    permission_classes = [IsAuthenticated]
+# class BookingListAPIView(generics.ListAPIView):
+#     serializer_class = BookingListSerializer
+#     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        user = self.request.user
-        qs = (
-            Booking.objects.all()
-            .select_related("service", "client", "accountant")
-            .order_by("-created_at")
-        )
+#     def get_queryset(self):
+#         user = self.request.user
+#         qs = (
+#             Booking.objects.all()
+#             .select_related("service", "client", "accountant")
+#             .order_by("-created_at")
+#         )
 
-        user_type = getattr(user, "user_type", "") or ""
-        if user_type.lower() == "accountant":
-            return qs.filter(accountant=user)
-        if user_type.lower() == "client":
-            return qs.filter(client=user)
-        return qs
+#         user_type = getattr(user, "user_type", "") or ""
+#         if user_type.lower() == "accountant":
+#             return qs.filter(accountant=user)
+#         if user_type.lower() == "client":
+#             return qs.filter(client=user)
+#         return qs
 
 
 class BookingDetailAPIView(generics.RetrieveAPIView):
@@ -84,7 +83,6 @@ class BookingDetailAPIView(generics.RetrieveAPIView):
 class AcceptBookingAPIView(views.APIView):
     """
     Accept a booking - only the service owner can accept
-    Creates a DM room between client and accountant when booking is accepted
     """
 
     permission_classes = [IsAuthenticated]
@@ -117,32 +115,16 @@ class AcceptBookingAPIView(views.APIView):
         booking.status = "confirmed"
         booking.save()
 
-        # Create DM room between client and accountant
-        try:
-            dm_room = create_or_get_dm_room(booking.client, booking.accountant)
-
-            return Response(
-                {
-                    "message": "Booking accepted successfully",
-                    "booking_id": str(booking.booking_id),
-                    "status": booking.status,
-                    "dm_room_id": str(dm_room.room_id),
-                    "dm_room_name": dm_room.room_name,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        except Exception as e:
-            # If DM room creation fails, still keep the booking accepted
-            return Response(
-                {
-                    "message": "Booking accepted successfully, but failed to create chat room",
-                    "booking_id": str(booking.booking_id),
-                    "status": booking.status,
-                    "error": str(e),
-                },
-                status=status.HTTP_200_OK,
-            )
+        return Response(
+            {
+                "message": "Booking accepted successfully",
+                "booking_id": str(booking.booking_id),
+                "status": booking.status,
+                "client_id": str(booking.client.id),
+                "accountant_id": str(booking.accountant.id),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class DeclineBookingAPIView(views.APIView):
@@ -169,14 +151,12 @@ class DeclineBookingAPIView(views.APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Check if booking is in declinable status
         if booking.status not in ["pending", "proposed"]:
             return Response(
                 {"error": f"Cannot decline booking with status: {booking.status}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Decline the booking
         booking.status = "declined"
         booking.save()
 

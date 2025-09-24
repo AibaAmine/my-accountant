@@ -169,7 +169,7 @@ class GroupChatRoomRetrieveUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPI
             .select_related("creator")
             .prefetch_related(
                 Prefetch(
-                    "user_last_seen",  # This matches your related_name
+                    "user_last_seen", 
                     queryset=UserRoomLastSeen.objects.filter(user=user),
                     to_attr="prefetched_user_last_seen",
                 )
