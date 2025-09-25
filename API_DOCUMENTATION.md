@@ -1958,7 +1958,14 @@ file: [selected_file.jpg]
 
 **WebSocket URL:** `wss://my-accountant-j02f.onrender.com/ws/chat/{room_id}/`
 
-**Authentication:** JWT token required via WebSocket headers or query parameters
+**Authentication:** JWT token required via Authorization header only
+
+**Connection Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Note:** Query parameter authentication is NOT supported. The JWT token must be provided in the Authorization header with "Bearer " prefix.
 
 **Connection Process:**
 

@@ -30,6 +30,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = [
+            "booking_id", 
             "service",
             "full_name",
             "linkedin_url",
@@ -95,6 +96,7 @@ class BookingUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = [
+            "booking_id",
             "status",
             "full_name",
             "linkedin_url",

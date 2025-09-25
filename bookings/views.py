@@ -46,24 +46,24 @@ class UpdateBookingAPIView(generics.UpdateAPIView):
         serializer.save()
 
 
-# class BookingListAPIView(generics.ListAPIView):
-#     serializer_class = BookingListSerializer
-#     permission_classes = [IsAuthenticated]
+class BookingListAPIView(generics.ListAPIView):
+    serializer_class = BookingListSerializer
+    permission_classes = [IsAuthenticated]
 
-#     def get_queryset(self):
-#         user = self.request.user
-#         qs = (
-#             Booking.objects.all()
-#             .select_related("service", "client", "accountant")
-#             .order_by("-created_at")
-#         )
+    def get_queryset(self):
+        user = self.request.user
+        qs = (
+            Booking.objects.all()
+            .select_related("service", "client", "accountant")
+            .order_by("-created_at")
+        )
 
-#         user_type = getattr(user, "user_type", "") or ""
-#         if user_type.lower() == "accountant":
-#             return qs.filter(accountant=user)
-#         if user_type.lower() == "client":
-#             return qs.filter(client=user)
-#         return qs
+        user_type = getattr(user, "user_type", "") or ""
+        if user_type.lower() == "accountant":
+            return qs.filter(accountant=user)
+        if user_type.lower() == "client":
+            return qs.filter(client=user)
+        return qs
 
 
 class BookingDetailAPIView(generics.RetrieveAPIView):
