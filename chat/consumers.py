@@ -56,8 +56,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             },
         )
 
-        # send the message history to the connected room
-        await self.send_message_history()
+        # Optionally send only recent messages for context (last 10 messages)
+        await self.send_recent_messages(limit=10)
 
     async def disconnect(self, close_code):
         # Leave room group
@@ -141,17 +141,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {
                     "type": "chat_message",
-                    "message_id": str(created_msg.message_id),
-                    "message": created_msg.content,
-                    "sender_id": str(created_msg.sender.id),
-                    "sender_full_name": created_msg.sender.full_name,
-                    "timestamp": created_msg.sent_at.isoformat(),
-                    "edited_at": (
-                        created_msg.edited_at.isoformat()
-                        if created_msg.edited_at
-                        else None
-                    ),
-                    "is_deleted": False,
+                    "message": {
+                        "message_id": str(created_msg.message_id),
+                        "content": created_msg.content,
+                        "sender": {
+                            "id": str(created_msg.sender.id),
+                            "full_name": created_msg.sender.full_name,
+                        },
+                        "sent_at": created_msg.sent_at.isoformat(),
+                        "edited_at": (
+                            created_msg.edited_at.isoformat()
+                            if created_msg.edited_at
+                            else None
+                        ),
+                        "is_deleted": False,
+                        "is_edited": created_msg.is_edited,
+                        "message_type": created_msg.message_type,
+                        "file": str(created_msg.file) if created_msg.file else None,
+                    },
                 },
             )
         except json.JSONDecodeError:
@@ -182,34 +189,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # Receive message from room group (event Handler for message)
     async def chat_message(self, event):
-        message = event["message"]
-        message_id = event.get("message_id")
-        sender_full_name = event.get("sender_full_name", "Unknown")
-        sender_id = (
-            str(event.get("sender_id", ""))
-            if event.get("sender_id") is not None
-            else None
-        )
-        sent_at = event.get("timestamp", "")
-
-        edited_at = event.get("edited_at")
-        is_deleted = event.get("is_deleted")
-
-        # Send message to WebSocket
-
+        # Send message object directly to WebSocket
         await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "chat_message",
-                    "message": message,
-                    "message_id": message_id,
-                    "sender_full_name": sender_full_name,
-                    "sender_id": sender_id,
-                    "timestamp": sent_at,
-                    "edited_at": edited_at,
-                    "is_deleted": is_deleted,
-                }
-            )
+            text_data=json.dumps({"type": "chat_message", "message": event["message"]})
         )
 
     # event Handler for typing indicator event (resived from the room group)
@@ -263,7 +245,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # method to get messages history for a room
     @database_sync_to_async
-    def get_message_history(self, room, limit=50):
+    def get_message_history(self, room, limit=10):
         return list(
             room.messages.order_by("-sent_at").values(
                 "message_id",
@@ -275,7 +257,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "file",
                 "edited_at",
                 "is_deleted",
-            )
+            )[:limit]
         )
 
     @database_sync_to_async
@@ -296,25 +278,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"Error updating last seen: {e}")
 
-    # method to send messages history to a room
-    async def send_message_history(self):
-        history = await self.get_message_history(self.room_obj)
-        for message_data in history:
-            await self.send(
-                text_data=json.dumps(
-                    {
-                        "type": "chat_message",
-                        "message": message_data["content"],
-                        "message_id": str(message_data["message_id"]),
-                        "sender_full_name": message_data["sender__full_name"],
-                        "sender_id": str(message_data["sender__id"]),
-                        "timestamp": message_data["sent_at"].isoformat(),
-                    }
+    # method to send recent messages for immediate context (limited)
+    async def send_recent_messages(self, limit=10):
+        """
+        Send only recent messages for immediate context.
+        Full message history should be loaded via REST API pagination.
+        """
+        history = await self.get_message_history(self.room_obj, limit=limit)
+
+        if history:
+            # Send messages in chronological order (oldest first)
+            for message_data in reversed(history):
+                await self.send(
+                    text_data=json.dumps(
+                        {
+                            "type": "chat_message",
+                            "message": message_data["content"],
+                            "message_id": str(message_data["message_id"]),
+                            "sender_full_name": message_data["sender__full_name"],
+                            "sender_id": str(message_data["sender__id"]),
+                            "timestamp": message_data["sent_at"].isoformat(),
+                            "is_historical": True,  # Mark as historical message
+                        }
+                    )
                 )
-            )
 
             print(
-                f"Sent {len(history)} historical messages to : {self.scope['user'].id } in {self.room_obj.room_name}"
+                f"Sent {len(history)} recent messages to : {self.scope['user'].id } in {self.room_obj.room_name}"
             )
 
     # --- Handlers for user join/leave/list events (called by channel layer) ---

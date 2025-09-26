@@ -1247,6 +1247,11 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
 
 ## 10. Bookings Management
 
+The booking system enables clients and accountants to create, manage, and interact with service bookings. The system supports two main booking flows based on service types:
+
+- **Offered Services**: Clients book accountants' offered services
+- **Needed Services**: Accountants propose to fulfill clients' needed services
+
 ### 1. Booking Creation
 
 #### Create Booking 🔒
@@ -1255,41 +1260,35 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
 
 **Headers:** `Authorization: Bearer <access_token>`
 
+**Content-Type:** `multipart/form-data` (supports file uploads)
+
 **Description:** Creates a new booking with role-specific behavior:
 
 **Role-Based Booking Types:**
 
-- **Clients booking Offered Services**: Direct booking (status: "pending") - requires schedule and price
-- **Accountants proposing to Needed Services**: Service proposal (status: "proposed") - optional schedule
+- **Clients booking Offered Services**: Only clients can book services offered by accountants
+- **Accountants proposing to Needed Services**: Only accountants can propose to fulfill services needed by clients
+- **Validation**: Users cannot book/propose to their own services
 
-**Request Body (Booking Offered Service):**
-
-```json
-{
-  "service": "uuid-of-offered-service",
-  "scheduled_start": "2025-02-01T10:00:00Z",
-  "scheduled_end": "2025-02-01T12:00:00Z",
-  "meeting_type": "online",
-  "agreed_price": 400.0
-}
-```
-
-**Request Body (Proposing to Needed Service):**
+**Request Body:**
 
 ```json
 {
-  "service": "uuid-of-needed-service",
-  "proposal_message": "I can help you with your tax filing. I have 10+ years experience...",
-  "scheduled_start": "2025-02-01T10:00:00Z",
-  "scheduled_end": "2025-02-01T12:00:00Z",
-  "meeting_type": "online",
-  "agreed_price": 500.0
+  "service": "uuid-of-service",
+  "full_name": "John Doe",
+  "linkedin_url": "https://linkedin.com/in/johndoe",
+  "cv_file": "file_upload",
+  "additional_notes": "I have experience in tax preparation and would like to discuss my requirements in detail..."
 }
 ```
 
-**Field Options:**
+**Fields:**
 
-- **meeting_type**: `online`, `in_person`, `phone`
+- **service** (required): UUID of the service to book/propose
+- **full_name** (required): Full name of the person booking
+- **linkedin_url** (optional): LinkedIn profile URL
+- **cv_file** (optional): CV/resume file upload
+- **additional_notes** (optional): Any additional information or requirements
 
 **Response (Success - 201):**
 
@@ -1300,27 +1299,76 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
     "pk": "uuid-here",
     "email": "client@example.com",
     "full_name": "John Doe",
-    "user_type": "client"
+    "user_type": "client",
+    "phone": "+1234567890",
+    "is_email_verified": true,
+    "account_status": "active",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
   },
   "accountant": {
     "pk": "uuid-here",
     "email": "accountant@example.com",
     "full_name": "Jane Smith",
-    "user_type": "accountant"
+    "user_type": "accountant",
+    "phone": "+1234567891",
+    "is_email_verified": true,
+    "account_status": "active",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
   },
   "service": {
     "id": "uuid-here",
+    "user": {
+      "pk": "uuid-here",
+      "email": "accountant@example.com",
+      "full_name": "Jane Smith",
+      "user_type": "accountant"
+    },
+    "service_type": "offered",
     "title": "Professional Tax Filing Service",
-    "service_type": "offered"
+    "description": "Comprehensive tax filing services for individuals and small businesses...",
+    "categories": [
+      {
+        "id": "uuid-here",
+        "name": "Tax Preparation"
+      }
+    ],
+    "price": "500.00",
+    "estimated_duration": 5,
+    "duration_unit": "days",
+    "delivery_method": "online",
+    "location": "16",
+    "is_active": true,
+    "is_featured": false,
+    "created_at": "2025-01-01T10:00:00Z",
+    "updated_at": "2025-01-01T10:00:00Z"
   },
-  "proposal_message": null,
-  "scheduled_start": "2025-02-01T10:00:00Z",
-  "scheduled_end": "2025-02-01T12:00:00Z",
-  "meeting_type": "online",
+  "full_name": "John Doe",
+  "linkedin_url": "https://linkedin.com/in/johndoe",
+  "cv_file": "/media/booking_cvs/john_doe_cv.pdf",
+  "additional_notes": "I have experience in tax preparation and would like to discuss my requirements...",
   "status": "pending",
-  "agreed_price": "400.00",
   "created_at": "2025-01-01T12:00:00Z",
   "updated_at": "2025-01-01T12:00:00Z"
+}
+```
+
+**Response (Error - 400):**
+
+```json
+{
+  "service": ["This field is required."],
+  "full_name": ["This field is required."],
+  "non_field_errors": ["Only a client can book an offered service."]
+}
+```
+
+**Response (Error - 403):**
+
+```json
+{
+  "detail": "You cannot propose to your own needed service."
 }
 ```
 
@@ -1332,7 +1380,10 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Retrieves all bookings for the authenticated user (as client or accountant).
+**Description:** Retrieves all bookings for the authenticated user (as client or accountant). Results are filtered based on user type:
+
+- **Clients**: See bookings where they are the client
+- **Accountants**: See bookings where they are the accountant
 
 **Response (Success - 200):**
 
@@ -1340,28 +1391,32 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
 [
   {
     "booking_id": "uuid-here",
-    "client": {
-      "pk": "uuid-here",
-      "email": "client@example.com",
-      "full_name": "John Doe",
-      "user_type": "client"
-    },
-    "accountant": {
-      "pk": "uuid-here",
-      "email": "accountant@example.com",
-      "full_name": "Jane Smith",
-      "user_type": "accountant"
-    },
     "service": {
       "id": "uuid-here",
+      "user": {
+        "pk": "uuid-here",
+        "email": "accountant@example.com",
+        "full_name": "Jane Smith",
+        "user_type": "accountant"
+      },
+      "service_type": "offered",
       "title": "Professional Tax Filing Service",
-      "service_type": "offered"
+      "description": "Comprehensive tax filing services...",
+      "categories": [
+        {
+          "id": "uuid-here",
+          "name": "Tax Preparation"
+        }
+      ],
+      "price": "500.00",
+      "estimated_duration": 5,
+      "duration_unit": "days",
+      "delivery_method": "online",
+      "location": "16",
+      "is_active": true,
+      "created_at": "2025-01-01T10:00:00Z"
     },
-    "scheduled_start": "2025-02-01T10:00:00Z",
-    "scheduled_end": "2025-02-01T12:00:00Z",
-    "status": "confirmed",
-    "meeting_type": "online",
-    "agreed_price": "400.00",
+    "status": "pending",
     "created_at": "2025-01-01T12:00:00Z"
   }
 ]
@@ -1373,7 +1428,7 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Retrieves detailed information about a specific booking where the user is a participant.
+**Description:** Retrieves detailed information about a specific booking where the user is a participant (either client or accountant).
 
 **Response (Success - 200):**
 
@@ -1384,34 +1439,66 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
     "pk": "uuid-here",
     "email": "client@example.com",
     "full_name": "John Doe",
-    "user_type": "client"
+    "user_type": "client",
+    "phone": "+1234567890",
+    "is_email_verified": true,
+    "account_status": "active",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
   },
   "accountant": {
     "pk": "uuid-here",
     "email": "accountant@example.com",
     "full_name": "Jane Smith",
-    "user_type": "accountant"
+    "user_type": "accountant",
+    "phone": "+1234567891",
+    "is_email_verified": true,
+    "account_status": "active",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
   },
   "service": {
     "id": "uuid-here",
-    "title": "Professional Tax Filing Service",
-    "description": "Comprehensive tax filing services...",
+    "user": {
+      "pk": "uuid-here",
+      "email": "accountant@example.com",
+      "full_name": "Jane Smith",
+      "user_type": "accountant"
+    },
     "service_type": "offered",
+    "title": "Professional Tax Filing Service",
+    "description": "Comprehensive tax filing services for individuals and small businesses...",
     "categories": [
       {
         "id": "uuid-here",
         "name": "Tax Preparation"
       }
-    ]
+    ],
+    "price": "500.00",
+    "estimated_duration": 5,
+    "duration_unit": "days",
+    "delivery_method": "online",
+    "location": "16",
+    "is_active": true,
+    "is_featured": false,
+    "created_at": "2025-01-01T10:00:00Z",
+    "updated_at": "2025-01-01T10:00:00Z"
   },
-  "proposal_message": "I can help you with your tax filing...",
-  "scheduled_start": "2025-02-01T10:00:00Z",
-  "scheduled_end": "2025-02-01T12:00:00Z",
-  "meeting_type": "online",
-  "status": "confirmed",
-  "agreed_price": "400.00",
+  "full_name": "John Doe",
+  "linkedin_url": "https://linkedin.com/in/johndoe",
+  "cv_file": "/media/booking_cvs/john_doe_cv.pdf",
+  "additional_notes": "I have experience in tax preparation and would like to discuss my requirements...",
+  "status": "pending",
   "created_at": "2025-01-01T12:00:00Z",
-  "updated_at": "2025-01-01T12:30:00Z"
+  "updated_at": "2025-01-01T12:00:00Z"
+}
+```
+
+**Response (Error - 404):**
+
+```json
+{
+  "detail": "Not found."
 }
 ```
 
@@ -1421,42 +1508,150 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Updates a booking. Available actions depend on current status and user role.
+**Content-Type:** `multipart/form-data` (supports file uploads)
+
+**Description:** Updates a booking's information or status. Only participants (client or accountant) can update a booking.
 
 **Status Transitions:**
 
-- **proposed** → `confirmed`, `declined`, `cancelled` (by service owner)
-- **pending** → `confirmed`, `cancelled` (by service owner)
-- **confirmed** → `in_progress`, `cancelled` (provider can mark in_progress)
-- **in_progress** → `completed`, `cancelled` (client can mark completed)
+- **pending** → `confirmed`, `declined` (only by service owner)
+- **confirmed** → No further transitions allowed (final state)
+- **declined** → No further transitions allowed (final state)
 
-**Request Body (Confirm Proposal):**
+**Request Body:**
 
 ```json
 {
   "status": "confirmed",
-  "agreed_price": 450.0
+  "full_name": "John Doe Updated",
+  "linkedin_url": "https://linkedin.com/in/johndoe-updated",
+  "cv_file": "new_cv_file",
+  "additional_notes": "Updated requirements and additional information..."
 }
 ```
 
-**Request Body (Update Schedule - only before confirmation):**
+**Fields:**
 
-```json
-{
-  "scheduled_start": "2025-02-02T10:00:00Z",
-  "scheduled_end": "2025-02-02T12:00:00Z",
-  "meeting_type": "phone"
-}
-```
+- **status** (optional): New status (`confirmed`, `declined`) - only service owner can change
+- **full_name** (optional): Updated full name
+- **linkedin_url** (optional): Updated LinkedIn profile URL
+- **cv_file** (optional): Updated CV/resume file
+- **additional_notes** (optional): Updated additional information
 
-**Response (Success - 200):** Updated booking object
+**Permission Rules:**
+
+- **Service Owner**: Can confirm or decline bookings (`confirmed`, `declined`)
+- **Participants**: Can update booking information (name, LinkedIn, CV, notes)
+- **Non-participants**: Cannot access or update
+
+**Response (Success - 200):** Updated booking object (same structure as booking details)
 
 **Response (Error - 400):**
 
 ```json
 {
   "status": ["Cannot transition from confirmed to declined."],
-  "scheduled_start": ["Schedule cannot be changed after confirmation."]
+  "non_field_errors": ["Only the service owner can confirm or decline."]
+}
+```
+
+**Response (Error - 403):**
+
+```json
+{
+  "detail": "You do not have permission to perform this action."
+}
+```
+
+### 3. Booking Status Management
+
+#### Accept Booking 🔒
+
+**Endpoint:** `POST /bookings/{booking_id}/accept/`
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Accept a pending booking. Only the service owner can accept bookings.
+
+**Request Body:** Empty (no body required)
+
+**Response (Success - 200):**
+
+```json
+{
+  "message": "Booking accepted successfully",
+  "booking_id": "uuid-here",
+  "status": "confirmed",
+  "client_id": "uuid-here",
+  "accountant_id": "uuid-here"
+}
+```
+
+**Response (Error - 403):**
+
+```json
+{
+  "error": "Only the service owner can accept this booking"
+}
+```
+
+**Response (Error - 400):**
+
+```json
+{
+  "error": "Cannot accept booking with status: confirmed"
+}
+```
+
+**Response (Error - 404):**
+
+```json
+{
+  "error": "Booking not found"
+}
+```
+
+#### Decline Booking 🔒
+
+**Endpoint:** `POST /bookings/{booking_id}/decline/`
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Decline a pending booking. Only the service owner can decline bookings.
+
+**Request Body:** Empty (no body required)
+
+**Response (Success - 200):**
+
+```json
+{
+  "message": "Booking declined successfully",
+  "booking_id": "uuid-here",
+  "status": "declined"
+}
+```
+
+**Response (Error - 403):**
+
+```json
+{
+  "error": "Only the service owner can decline this booking"
+}
+```
+
+**Response (Error - 400):**
+
+```json
+{
+  "error": "Cannot decline booking with status: confirmed"
+}
+```
+
+**Response (Error - 404):**
+
+```json
+{
+  "error": "Booking not found"
 }
 ```
 
@@ -1961,6 +2156,7 @@ file: [selected_file.jpg]
 **Authentication:** JWT token required via Authorization header only
 
 **Connection Headers:**
+
 ```
 Authorization: Bearer <access_token>
 ```
@@ -2015,15 +2211,24 @@ The WebSocket will send you the following message types:
 ```json
 {
   "type": "chat_message",
-  "message": "Hello everyone!",
-  "message_id": "uuid-here",
-  "sender_full_name": "John Doe",
-  "sender_id": "uuid-here",
-  "timestamp": "2025-01-01T12:00:00Z",
-  "edited_at": null,
-  "is_deleted": false
+  "message": {
+    "message_id": "uuid-here",
+    "content": "Hello everyone!",
+    "sender": {
+      "id": "uuid-here",
+      "full_name": "John Doe"
+    },
+    "sent_at": "2025-01-01T12:00:00Z",
+    "edited_at": null,
+    "is_deleted": false,
+    "is_edited": false,
+    "message_type": "text",
+    "file": null
+  }
 }
 ```
+
+**Note:** This new format applies to newly sent messages. Historical messages and other events maintain their original format.
 
 **User Join Event:**
 
@@ -2107,12 +2312,20 @@ When a file is uploaded via the REST API, it's automatically broadcast to all ro
 ```json
 {
   "type": "chat_message",
-  "message_id": "uuid-here",
-  "message": "/media/chat_files/uploaded_image.jpg",
-  "sender_id": "uuid-here",
-  "sender_full_name": "John Doe",
-  "timestamp": "2025-01-01T12:00:00Z",
-  "message_type": "file"
+  "message": {
+    "message_id": "uuid-here",
+    "content": "/media/chat_files/uploaded_image.jpg",
+    "sender": {
+      "id": "uuid-here",
+      "full_name": "John Doe"
+    },
+    "sent_at": "2025-01-01T12:00:00Z",
+    "edited_at": null,
+    "is_deleted": false,
+    "is_edited": false,
+    "message_type": "file",
+    "file": "/media/chat_files/uploaded_image.jpg"
+  }
 }
 ```
 
@@ -2328,23 +2541,44 @@ When a file is uploaded via the REST API, it's automatically broadcast to all ro
 
 ### Booking Flow
 
-#### For Offered Services (Accountant → Client)
+#### For Offered Services (Client books Accountant's service)
 
-1. **Accountant** creates service: `POST /services/create/` (service_type: "offered")
-2. **Client** browses services: `GET /services/browse/`
-3. **Client** books service: `POST /bookings/create/` (status: "pending")
-4. **Accountant** confirms/declines: `PATCH /bookings/{booking_id}/update/` (status: "confirmed"/"declined")
-5. **Accountant** starts session: `PATCH /bookings/{booking_id}/update/` (status: "in_progress")
-6. **Client** marks complete: `PATCH /bookings/{booking_id}/update/` (status: "completed")
+1. **Accountant** creates offered service: `POST /services/create/` (service_type: "offered")
+2. **Client** browses offered services: `GET /services/browse/`
+3. **Client** books service: `POST /bookings/create/` with service details (status: "pending")
+4. **Accountant** (service owner) accepts: `POST /bookings/{booking_id}/accept/` (status: "confirmed")
+   - OR **Accountant** declines: `POST /bookings/{booking_id}/decline/` (status: "declined")
+   - OR **Accountant** updates status: `PATCH /bookings/{booking_id}/update/` (status: "confirmed"/"declined")
 
-#### For Needed Services (Client → Accountant)
+#### For Needed Services (Accountant proposes to Client's request)
 
-1. **Client** creates service: `POST /services/create/` (service_type: "needed")
-2. **Accountant** browses services: `GET /services/browse/`
-3. **Accountant** makes proposal: `POST /bookings/create/` (status: "proposed")
-4. **Client** confirms/declines: `PATCH /bookings/{booking_id}/update/` (status: "confirmed"/"declined")
-5. **Accountant** starts session: `PATCH /bookings/{booking_id}/update/` (status: "in_progress")
-6. **Client** marks complete: `PATCH /bookings/{booking_id}/update/` (status: "completed")
+1. **Client** creates needed service: `POST /services/create/` (service_type: "needed")
+2. **Accountant** browses needed services: `GET /services/browse/`
+3. **Accountant** proposes to fulfill: `POST /bookings/create/` with proposal details (status: "pending")
+4. **Client** (service owner) accepts: `POST /bookings/{booking_id}/accept/` (status: "confirmed")
+   - OR **Client** declines: `POST /bookings/{booking_id}/decline/` (status: "declined")
+   - OR **Client** updates status: `PATCH /bookings/{booking_id}/update/` (status: "confirmed"/"declined")
+
+#### Booking Information Flow
+
+**During Booking Creation:**
+
+- **Full Name**: Contact person's name
+- **LinkedIn URL**: Optional professional profile link
+- **CV File**: Optional resume/CV upload (supports file uploads)
+- **Additional Notes**: Optional requirements, questions, or additional information
+
+**Status Flow:**
+
+- **pending**: Initial status after booking creation
+- **confirmed**: Service owner accepted the booking (final state)
+- **declined**: Service owner declined the booking (final state)
+
+**Permissions:**
+
+- Only the **service owner** can accept/decline bookings
+- Both **client** and **accountant** can view booking details if they are participants
+- Both participants can update booking information (name, LinkedIn, CV, notes)
 
 **Note**: Academic users cannot participate in the booking system as they don't have access to the service marketplace.
 
