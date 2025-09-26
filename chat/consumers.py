@@ -257,6 +257,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "file",
                 "edited_at",
                 "is_deleted",
+                "is_edited",
             )[:limit]
         )
 
@@ -293,11 +294,30 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     text_data=json.dumps(
                         {
                             "type": "chat_message",
-                            "message": message_data["content"],
-                            "message_id": str(message_data["message_id"]),
-                            "sender_full_name": message_data["sender__full_name"],
-                            "sender_id": str(message_data["sender__id"]),
-                            "timestamp": message_data["sent_at"].isoformat(),
+                            "message": {
+                                "message_id": str(message_data["message_id"]),
+                                "content": message_data["content"],
+                                "sender": {
+                                    "id": str(message_data["sender__id"]),
+                                    "full_name": message_data["sender__full_name"],
+                                },
+                                "sent_at": message_data["sent_at"].isoformat(),
+                                "edited_at": (
+                                    message_data["edited_at"].isoformat()
+                                    if message_data["edited_at"]
+                                    else None
+                                ),
+                                "is_deleted": message_data.get("is_deleted", False),
+                                "is_edited": message_data.get("is_edited", False),
+                                "message_type": message_data.get(
+                                    "message_type", "text"
+                                ),
+                                "file": (
+                                    str(message_data["file"])
+                                    if message_data["file"]
+                                    else None
+                                ),
+                            },
                             "is_historical": True,  # Mark as historical message
                         }
                     )
