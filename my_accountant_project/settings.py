@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "chat",
     "learning",
     "notifications",
+    "realtime",
 ]
 # Use custom adapter to populate full_name on social login
 SOCIALACCOUNT_ADAPTER = "accounts.adapters.CustomSocialAccountAdapter"

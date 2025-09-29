@@ -99,7 +99,6 @@ class GroupChatRoomListAPIView(generics.ListAPIView):
             .order_by("-last_message_time")
         )
 
-
 # user Direct Message Rooms
 class DirectMessageRoomListAPIView(generics.ListAPIView):
     serializer_class = ChatRoomSerializer
@@ -573,3 +572,5 @@ def can_create_rooms(user):
 def can_access_rooms(user):
     """Clients cannot access rooms at all"""
     return user.user_type != "client"
+
+

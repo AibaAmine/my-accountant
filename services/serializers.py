@@ -44,6 +44,9 @@ class ServiceListSerializer(serializers.ModelSerializer):
             "delivery_method",
             "is_featured",
             "attachments_count",
+            "estimated_duration",
+            "duration_unit",
+            "estimated_duration_description",
             "created_at",
         ]
         read_only_fields = ("id", "created_at", "user", "updated_at", "service_type")
@@ -367,7 +370,6 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
         else:
             representation["categories"] = []
 
-       
         attachments = instance.service_attachments.all()
         representation["all_attachments"] = ServiceAttachmentSerializer(
             attachments, many=True, context=self.context
