@@ -92,6 +92,54 @@ class GlobalConsumer(AsyncWebsocketConsumer):
             text_data=json.dumps({"type": "chat_message", "message": event["message"]})
         )
 
+    async def handle_join_room(self, data):
+        room_id = data.get("room_id")
+        if not room_id:
+            await self.send(text_data=json.dumps({"error": "room id is required"}))
+            return
+
+        room_obj = await self.get_room(room_id)
+        if not room_obj:
+            await self.send(text_data=json.dumps({"error": "Room not found"}))
+            return
+
+        if not await self.is_user_member_of_room(room_obj, self.user):
+            await self.send(
+                text_data=json.dumps({"error": "Not authorizer to join this room"})
+            )
+            return
+
+        # join room group
+        room_group_name = f"chat_{room_id}"
+        await self.channel_layer.group_add(room_group_name, self.channel_name)
+
+        self.active_rooms[room_id] = room_obj
+
+        # Send success response
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "room_joined",
+                    "room_id": room_id,
+                    "room_name": room_obj.room_name,
+                }
+            )
+        )
+
+
+        # Broadcast to others in room that this user joined
+        await self.channel_layer.group_send(
+            room_group_name,
+            {
+                "type": "user.join",
+                "user_id": str(self.user.id),
+                "full_name": self.user.full_name,
+                "room_id": room_id,
+            },
+        )
+        
+        
+
     # event Handler for typing indicator event (resived from the room group)
 
     async def typing_indicator(self, event):
@@ -117,6 +165,7 @@ class GlobalConsumer(AsyncWebsocketConsumer):
 
     # -- HELPER METHODS FOR DB OPERATIONS --
 
+    # todo : move those funcs to chat.services.py
     @database_sync_to_async
     def get_room(self, room_id):
         try:
