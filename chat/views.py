@@ -99,6 +99,7 @@ class GroupChatRoomListAPIView(generics.ListAPIView):
             .order_by("-last_message_time")
         )
 
+
 # user Direct Message Rooms
 class DirectMessageRoomListAPIView(generics.ListAPIView):
     serializer_class = ChatRoomSerializer
@@ -168,7 +169,7 @@ class GroupChatRoomRetrieveUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPI
             .select_related("creator")
             .prefetch_related(
                 Prefetch(
-                    "user_last_seen", 
+                    "user_last_seen",
                     queryset=UserRoomLastSeen.objects.filter(user=user),
                     to_attr="prefetched_user_last_seen",
                 )
@@ -232,8 +233,24 @@ class ChatRoomAddMemberAPIView(views.APIView):
 
         ChatMembers.objects.create(room_id=room, user_id=target_user)
 
+        # Broadcast member added event to all room users
+        channel_layer = get_channel_layer()
+        room_group_name = f"chat_{room.room_id}"
+
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                "type": "member.added",
+                "user_id": str(target_user.id),
+                "full_name": target_user.full_name,
+                "room_id": str(room.room_id),
+                "added_by": str(request.user.id),
+                "added_by_name": request.user.full_name,
+            },
+        )
         serializer = ChatRoomSerializer(room)
-        return Response("User added successfully", status=status.HTTP_200_OK)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class ChatRoomRemoveMemberAPIView(views.APIView):
@@ -270,6 +287,22 @@ class ChatRoomRemoveMemberAPIView(views.APIView):
             )
 
         room.members.filter(user_id=target_user).delete()
+
+        # Broadcast member removed event to all room users
+        channel_layer = get_channel_layer()
+        room_group_name = f"chat_{room.room_id}"
+
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                "type": "member.removed",
+                "user_id": str(target_user.id),
+                "full_name": target_user.full_name,
+                "room_id": str(room.room_id),
+                "removed_by": str(request.user.id),
+                "removed_by_name": request.user.full_name,
+            },
+        )
 
         serializer = ChatRoomSerializer(room)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -572,5 +605,3 @@ def can_create_rooms(user):
 def can_access_rooms(user):
     """Clients cannot access rooms at all"""
     return user.user_type != "client"
-
-

@@ -1,4 +1,4 @@
-# My Accountant Platform - Complete API Documentation
+﻿# My Accountant Platform - Complete API Documentation
 
 ## Overview
 
@@ -1659,22 +1659,24 @@ The booking system enables clients and accountants to create, manage, and intera
 
 ## 11. Chat System
 
-The Chat System provides real-time messaging capabilities between users with role-based access control. The system supports both group chat rooms and direct messaging (DM) with WebSocket connections for real-time communication.
+The Chat System provides real-time messaging capabilities with a **global WebSocket connection** architecture. Users maintain a single WebSocket connection for all chat features including messaging, presence tracking, typing indicators, and room list updates.
 
 ### 1. Chat System Overview
 
 #### System Features
 
-- **Real-time messaging** via WebSocket connections
+- **Global WebSocket connection** - One connection per user for all real-time features
+- **Real-time messaging** across multiple rooms simultaneously
+- **Global presence system** - Online/offline status visible across all shared rooms
 - **Role-based communication** with strict permission controls
 - **Group chat rooms** for multi-user conversations
 - **Direct messaging (DM)** for one-on-one conversations
 - **File sharing** support (images, documents, etc.)
-- **Message editing and deletion** capabilities
 - **Typing indicators** for real-time interaction feedback
-- **Online presence tracking** using Redis
-- **Unread message counts** and notification system
-- **Message history** with pagination
+- **Room list updates** - Automatic reordering and message previews
+- **Member management** - Real-time add/remove notifications
+- **Unread message tracking** - Badge counts and read status
+- **Message history** with pagination via REST API
 - **Search functionality** across messages and users
 
 #### Role-Based Communication Rules
@@ -1683,9 +1685,9 @@ The Chat System provides real-time messaging capabilities between users with rol
 
 | User Type      | Can Message Clients | Can Message Accountants | Can Message Academics | Can Create Group Rooms | Can Access Group Rooms |
 | -------------- | :-----------------: | :---------------------: | :-------------------: | :--------------------: | :--------------------: |
-| **Client**     |         ❌          |           ✅            |          ❌           |           ❌           |           ❌           |
-| **Accountant** |         ✅          |           ✅            |          ✅           |           ✅           |           ✅           |
-| **Academic**   |         ❌          |           ✅            |          ✅           |           ❌           |           ✅           |
+| **Client**     |         âŒ          |           âœ…           |          âŒ           |           âŒ           |           âŒ           |
+| **Accountant** |         âœ…         |           âœ…           |          âœ…          |          âœ…           |          âœ…           |
+| **Academic**   |         âŒ          |           âœ…           |          âœ…          |           âŒ           |          âœ…           |
 
 **Key Rules:**
 
@@ -2147,78 +2149,282 @@ file: [selected_file.jpg]
 }
 ```
 
-### 3. WebSocket Connection
+### 3. WebSocket Real-Time Communication
 
-#### Connect to Chat Room
+#### Overview
 
-**WebSocket URL:** `wss://my-accountant-j02f.onrender.com/ws/chat/{room_id}/`
+The platform uses a **global WebSocket connection** for all real-time features. Each user maintains a single WebSocket connection that handles:
 
-**Authentication:** JWT token required via Authorization header only
+- Real-time messaging across all rooms
+- Global presence tracking (online/offline status)
+- Typing indicators
+- Room list updates
+- Member management notifications
 
-**Connection Headers:**
+#### Connect to WebSocket
+
+**WebSocket URL:**
 
 ```
-Authorization: Bearer <access_token>
+Production: wss://my-accountant-j02f.onrender.com/ws/global/
 ```
 
-**Note:** Query parameter authentication is NOT supported. The JWT token must be provided in the Authorization header with "Bearer " prefix.
+**Authentication:** Include JWT token in connection URL
 
-**Connection Process:**
+```
+ws://localhost:8000/ws/global/?token=<your_jwt_token>
+```
 
-1. **Authentication Check**: User must be authenticated via JWT
-2. **Room Membership Verification**: User must be a member of the specified room
-3. **Role-Based Access**: User's role must allow chat room access
-4. **Real-time Presence**: User is added to Redis presence tracking
-5. **Message History**: Last 50 messages are sent upon connection
-6. **User List**: Current online users in the room are broadcast
+**Connection Flow:**
+
+1. **Connect**: User establishes WebSocket connection with JWT token
+2. **Global Presence**: User automatically goes online globally
+3. **Presence Broadcast**: All users in shared rooms receive online status
+4. **Ready**: User can now join rooms and send/receive messages
 
 **Connection Close Codes:**
 
-- **4000**: Room not found
 - **4001**: Unauthorized (invalid/missing JWT token)
-- **4003**: Forbidden access (not a room member or role restrictions)
 
-#### WebSocket Message Types
+---
 
-**Sending Messages:**
+#### Client to Server Messages
 
-You can send the following message types to the WebSocket:
+Messages you send TO the server:
 
-**Text Message:**
+##### 1. Join Room
+
+Join a chat room to send/receive messages in that room.
+
+**Request:**
 
 ```json
 {
-  "type": "message",
+  "type": "join_room",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365"
+}
+```
+
+**Success Response:**
+
+```json
+{
+  "type": "room_joined",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365",
+  "room_name": "General Chat"
+}
+```
+
+**Error Responses:**
+
+```json
+{"error": "room_id is required"}
+{"error": "Room not found"}
+{"error": "Not authorized to join this room"}
+```
+
+---
+
+##### 2. Leave Room
+
+Leave a chat room.
+
+**Request:**
+
+```json
+{
+  "type": "leave_room",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365"
+}
+```
+
+**Success Response:**
+
+```json
+{
+  "type": "room_left",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365"
+}
+```
+
+**Error Responses:**
+
+```json
+{"error": "room_id is required"}
+{"error": "You are not in this room"}
+```
+
+---
+
+##### 3. Send Message
+
+Send a message to a room. **You must join the room first.**
+
+**Request:**
+
+```json
+{
+  "type": "send_message",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365",
   "content": "Hello everyone!"
 }
 ```
 
-**Typing Indicator:**
+**Success Response (Delivery Confirmation):**
+
+```json
+{
+  "type": "message_sent",
+  "message_id": "cd4f5823-4cfc-421d-8743-516e7d5853bb",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365",
+  "status": "delivered"
+}
+```
+
+**Error Responses:**
+
+```json
+{"error": "You must join the room first"}
+{"error": "room_id and content are required"}
+```
+
+---
+
+##### 4. Typing Indicator
+
+Notify others when you're typing in a room.
+
+**Start Typing:**
 
 ```json
 {
   "type": "typing",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365",
   "is_typing": true
 }
 ```
 
-**Receiving Messages:**
+**Stop Typing:**
 
-The WebSocket will send you the following message types:
+```json
+{
+  "type": "typing",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365",
+  "is_typing": false
+}
+```
 
-**Chat Message:**
+**Error Responses:**
+
+```json
+{"error": "room_id is required"}
+{"error": "You must join the room first"}
+```
+
+---
+
+#### Server to Client Events
+
+Events you receive FROM the server:
+
+##### 1. Chat Message
+
+Received when a new message is sent to a room you're in.
+
+**Event:**
 
 ```json
 {
   "type": "chat_message",
   "message": {
-    "message_id": "uuid-here",
+    "message_id": "cd4f5823-4cfc-421d-8743-516e7d5853bb",
     "content": "Hello everyone!",
     "sender": {
-      "id": "uuid-here",
+      "id": "123e4567-e89b-12d3-a456-426614174000",
       "full_name": "John Doe"
     },
-    "sent_at": "2025-01-01T12:00:00Z",
+    "sent_at": "2025-01-10T22:30:00.000Z",
+    "edited_at": null,
+    "is_deleted": false,
+    "is_edited": false,
+    "message_type": "text",
+    "file": null,
+    "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365"
+  }
+}
+```
+
+**Message Types:**
+
+- `text` - Regular text message
+- `file` - File attachment (check `file` field for URL)
+
+---
+
+##### 2. User Status Changed
+
+Received when a user in your shared rooms goes online/offline.
+
+**Event:**
+
+```json
+{
+  "type": "user_status_changed",
+  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+  "full_name": "John Doe",
+  "status": "online"
+}
+```
+
+**Status Values:**
+
+- `online` - User is connected
+- `offline` - User has disconnected
+
+**Note:** This event is sent for all users who share at least one room with you.
+
+---
+
+##### 3. Typing Indicator
+
+Received when another user starts/stops typing in a room you're in.
+
+**Event:**
+
+```json
+{
+  "type": "typing_indicator",
+  "user": "John Doe",
+  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+  "is_typing": true,
+  "room": "General Chat",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365"
+}
+```
+
+---
+
+##### 4. Room List Update â­ NEW
+
+Received when a message is sent to ANY room you're a member of. Use this to update your room list.
+
+**Event:**
+
+```json
+{
+  "type": "room_list_update",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365",
+  "room_name": "General Chat",
+  "is_dm": false,
+  "has_unread": true,
+  "latest_message": {
+    "message_id": "cd4f5823-4cfc-421d-8743-516e7d5853bb",
+    "content": "Hello everyone!",
+    "sender": {
+      "id": "123e4567-e89b-12d3-a456-426614174000",
+      "full_name": "John Doe"
+    },
+    "sent_at": "2025-01-10T22:30:00.000Z",
     "edited_at": null,
     "is_deleted": false,
     "is_edited": false,
@@ -2228,86 +2434,62 @@ The WebSocket will send you the following message types:
 }
 ```
 
-**Note:** This new format applies to newly sent messages. Historical messages and other events maintain their original format.
+**Field Descriptions:**
 
-**User Join Event:**
+- `has_unread`: `true` if this is an unread message for you (false if you're the sender)
+- `is_dm`: `true` if this is a direct message room
+- `latest_message`: Complete message object for preview
 
-```json
-{
-  "type": "user_join",
-  "user_id": "uuid-here",
-  "full_name": "Jane Smith"
-}
-```
+**Usage:**
 
-**User Leave Event:**
+1. Move room to top of your room list
+2. Update message preview text
+3. Show/hide unread indicator (red badge, bold text)
+4. Display message timestamp
 
-```json
-{
-  "type": "user_leave",
-  "user_id": "uuid-here",
-  "user_full_name": "Jane Smith"
-}
-```
+---
 
-**Typing Indicator:**
+##### 5. Member Added
+
+Received when a new member is added to a room you're in.
+
+**Event:**
 
 ```json
 {
-  "type": "typing_indicator",
-  "user": "Jane Smith",
-  "user_id": "uuid-here",
-  "room": "General Discussion",
-  "is_typing": true
+  "type": "member_added",
+  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+  "full_name": "John Doe",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365",
+  "added_by": "456e7890-e89b-12d3-a456-426614174001",
+  "added_by_name": "Admin User"
 }
 ```
 
-**Message Edited:**
+---
+
+##### 6. Member Removed
+
+Received when a member is removed from a room you're in.
+
+**Event:**
 
 ```json
 {
-  "type": "message_edited",
-  "message_id": "uuid-here",
-  "new_content": "Updated message content",
-  "edited_at": "2025-01-01T12:05:00Z",
-  "room_id": "uuid-here",
-  "sender_id": "uuid-here",
-  "sender_full_name": "John Doe"
+  "type": "member_removed",
+  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+  "full_name": "John Doe",
+  "room_id": "6a8df2c9-dc5b-4aee-81c6-a4b126683365",
+  "removed_by": "456e7890-e89b-12d3-a456-426614174001",
+  "removed_by_name": "Admin User"
 }
 ```
 
-**Message Deleted:**
-
-```json
-{
-  "type": "message_deleted",
-  "message_id": "uuid-here",
-  "room_id": "uuid-here",
-  "edited_at": "2025-01-01T12:05:00Z"
-}
-```
-
-**Room Users List:**
-
-```json
-{
-  "type": "room_users_list",
-  "users": [
-    {
-      "id": "uuid-here",
-      "full_name": "John Doe"
-    },
-    {
-      "id": "uuid-here",
-      "full_name": "Jane Smith"
-    }
-  ]
-}
-```
+---
 
 #### File Messages
 
-When a file is uploaded via the REST API, it's automatically broadcast to all room members via WebSocket as:
+When a file is uploaded via the REST API (`POST /chat/rooms/{room_id}/upload_file/`), it's automatically broadcast to all room members:
 
 ```json
 {
@@ -2319,15 +2501,56 @@ When a file is uploaded via the REST API, it's automatically broadcast to all ro
       "id": "uuid-here",
       "full_name": "John Doe"
     },
-    "sent_at": "2025-01-01T12:00:00Z",
+    "sent_at": "2025-01-10T22:30:00.000Z",
     "edited_at": null,
     "is_deleted": false,
     "is_edited": false,
     "message_type": "file",
-    "file": "/media/chat_files/uploaded_image.jpg"
+    "file": "/media/chat_files/uploaded_image.jpg",
+    "room_id": "room-uuid-here"
   }
 }
 ```
+
+---
+
+#### Implementation Best Practices
+
+**Connection Management:**
+
+- Maintain single WebSocket connection per user
+- Implement automatic reconnection on disconnect
+- Handle connection state changes gracefully
+- Clean up resources on disconnect
+
+**Message Handling:**
+
+- Join room before sending messages
+- Handle delivery confirmations
+- Display messages immediately on send
+- Show loading state until delivery confirmed
+
+**Presence Updates:**
+
+- User goes online on WebSocket connect
+- User goes offline on WebSocket disconnect
+- No manual presence updates needed
+- Presence is global, not per-room
+
+**Room List Management:**
+
+- Move rooms to top on new messages
+- Update message previews immediately
+- Show unread badges for recipients only
+- Sender doesn't see unread badge on own messages
+- Sort room list by latest activity
+
+**Error Handling:**
+
+- Handle all error messages from server
+- Display user-friendly error messages
+- Retry failed operations when appropriate
+- Log errors for debugging
 
 ### 4. Error Handling
 
@@ -2664,5 +2887,6 @@ https://my-accountant-j02f.onrender.com/
 
 ---
 
-_Last Updated: September 13, 2025_
+_Last Updated: January 10, 2025_
 _API Version: v1_
+_WebSocket Protocol: v1_

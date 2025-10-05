@@ -80,7 +80,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
 class ChatRoomCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatRooms
-        fields = ["room_name", "description", "is_private"]
+        fields = ["room_id", "room_name", "description", "is_private"]
         read_only_fields = ["room_id", "created_at", "creator", "is_dm"]
 
 

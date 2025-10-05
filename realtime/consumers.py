@@ -25,12 +25,23 @@ class GlobalConsumer(AsyncWebsocketConsumer):
         # Initialize active rooms tracking
         self.active_rooms = {}
 
+        # Set user as globally online
+        await self.set_user_global_online_status(True)
+
+        # Notify all shared rooms that user is online
+        await self.notify_shared_rooms_of_user_status("online")
+
         await self.accept()
         print(f"websocket connect globla consumer User : {self.user.id}")
 
     async def disconnect(self, close_code):
         # Leave room group
         if not isinstance(self.scope["user"], AnonymousUser):
+            # Set user as globally offline
+            await self.set_user_global_online_status(False)
+
+            # Notify all shared rooms that user is offline
+            await self.notify_shared_rooms_of_user_status("offline")
             # if authorized
             await self.channel_layer.group_discard(
                 self.user_group_name, self.channel_name
@@ -60,10 +71,8 @@ class GlobalConsumer(AsyncWebsocketConsumer):
             message_type = text_data_json.get("type")
 
             if message_type == "join_room":
-                # todo add this method
                 await self.handle_join_room(text_data_json)
             elif message_type == "leave_room":
-                # todo add this method
                 await self.handle_leave_room(text_data_json)
             elif message_type == "send_message":
                 # todo add this method
@@ -92,10 +101,11 @@ class GlobalConsumer(AsyncWebsocketConsumer):
             text_data=json.dumps({"type": "chat_message", "message": event["message"]})
         )
 
+    # handler for room join message
     async def handle_join_room(self, data):
         room_id = data.get("room_id")
         if not room_id:
-            await self.send(text_data=json.dumps({"error": "room id is required"}))
+            await self.send(text_data=json.dumps({"error": "room_id is required"}))
             return
 
         room_obj = await self.get_room(room_id)
@@ -105,7 +115,7 @@ class GlobalConsumer(AsyncWebsocketConsumer):
 
         if not await self.is_user_member_of_room(room_obj, self.user):
             await self.send(
-                text_data=json.dumps({"error": "Not authorizer to join this room"})
+                text_data=json.dumps({"error": "Not authorized to join this room"})
             )
             return
 
@@ -119,6 +129,7 @@ class GlobalConsumer(AsyncWebsocketConsumer):
         await self.send(
             text_data=json.dumps(
                 {
+                    # add the user infos here
                     "type": "room_joined",
                     "room_id": room_id,
                     "room_name": room_obj.room_name,
@@ -126,19 +137,129 @@ class GlobalConsumer(AsyncWebsocketConsumer):
             )
         )
 
+    async def handle_typing_indicator(self, data):
+        room_id = data.get("room_id")
+        is_typing = data.get("is_typing", False)
 
-        # Broadcast to others in room that this user joined
+        if not room_id:
+            await self.send(text_data=json.dumps({"error": "room_id is required"}))
+            return
+
+        # Check if user is in the room
+        if room_id not in self.active_rooms:
+            await self.send(
+                text_data=json.dumps({"error": "You must join the room first"})
+            )
+            return
+
+        room_obj = self.active_rooms[room_id]
+        room_group_name = f"chat_{room_id}"
+
+        # Broadcast typing indicator to others in room
         await self.channel_layer.group_send(
             room_group_name,
             {
-                "type": "user.join",
+                "type": "typing.indicator",
+                "user": self.user.full_name,
                 "user_id": str(self.user.id),
-                "full_name": self.user.full_name,
+                "is_typing": is_typing,
+                "room": room_obj.room_name,
                 "room_id": room_id,
             },
         )
-        
-        
+
+    async def handle_leave_room(self, data):
+        room_id = data.get("room_id")
+        if not room_id:
+            await self.send(text_data=json.dumps({"error": "room_id is required"}))
+            return
+
+        if room_id not in self.active_rooms:
+            await self.send(text_data=json.dumps({"error": "You are not in this room"}))
+            return
+
+        room_obj = self.active_rooms[room_id]
+        room_group_name = f"chat_{room_id}"
+
+        await self.channel_layer.group_discard(room_group_name, self.channel_name)
+
+        del self.active_rooms[room_id]
+
+        await self.send(text_data=json.dumps({"type": "room_left", "room_id": room_id}))
+
+    async def handle_send_message(self, data):
+
+        room_id = data.get("room_id")
+        content = data.get("content")
+        if not room_id or not content:
+            await self.send(
+                text_data=json.dumps({"error": "room_id and content are required"})
+            )
+            return
+
+        if room_id not in self.active_rooms:
+            await self.send(
+                text_data=json.dumps({"error": "You must join the room first"})
+            )
+            return
+
+        room_obj = self.active_rooms[room_id]
+
+        try:
+            # Save message to database
+            created_msg = await self.save_chat_message(room_obj, self.user, content)
+            if not created_msg:
+                await self.send(
+                    text_data=json.dumps({"error": "Failed to save message"})
+                )
+                return
+
+            # Broadcast message to all room members (including sender)
+            room_group_name = f"chat_{room_id}"
+            await self.channel_layer.group_send(
+                room_group_name,
+                {
+                    "type": "chat_message",
+                    "message": {
+                        "message_id": str(created_msg.message_id),
+                        "content": created_msg.content,
+                        "sender": {
+                            "id": str(created_msg.sender.id),
+                            "full_name": created_msg.sender.full_name,
+                        },
+                        "sent_at": created_msg.sent_at.isoformat(),
+                        "edited_at": (
+                            created_msg.edited_at.isoformat()
+                            if created_msg.edited_at
+                            else None
+                        ),
+                        "is_deleted": False,
+                        "is_edited": created_msg.is_edited,
+                        "message_type": created_msg.message_type,
+                        "file": str(created_msg.file) if created_msg.file else None,
+                        "room_id": room_id,
+                    },
+                },
+            )
+
+            await self.send(
+                text_data=json.dumps(
+                    {
+                        "type": "message_sent",
+                        "message_id": str(created_msg.message_id),
+                        "room_id": room_id,
+                        "status": "delivered",
+                    }
+                )
+            )
+
+            # Send room list update to ALL room members
+            await self.send_room_list_update_to_members(room_obj, created_msg)
+
+        except Exception as e:
+            print(f"Error processing message: {e}")
+            await self.send(text_data=json.dumps({"error": f"Server error: {e}"}))
+            return
 
     # event Handler for typing indicator event (resived from the room group)
 
@@ -159,6 +280,36 @@ class GlobalConsumer(AsyncWebsocketConsumer):
                     "user_id": user_id,
                     "room": room,
                     "is_typing": is_typing,
+                }
+            )
+        )
+
+    async def member_added(self, event):
+        """Handle new member added to room"""
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "member_added",
+                    "user_id": event["user_id"],
+                    "full_name": event["full_name"],
+                    "room_id": event["room_id"],
+                    "added_by": event["added_by"],
+                    "added_by_name": event["added_by_name"],
+                }
+            )
+        )
+
+    async def member_removed(self, event):
+        """Handle member removed from room"""
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "member_removed",
+                    "user_id": event["user_id"],
+                    "full_name": event["full_name"],
+                    "room_id": event["room_id"],
+                    "removed_by": event["removed_by"],
+                    "removed_by_name": event["removed_by_name"],
                 }
             )
         )
@@ -189,39 +340,6 @@ class GlobalConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"Error saving chat message : {e}")
             return None
-
-    # --- Handlers for user join/leave/list events (called by channel layer) ---
-    async def user_join(self, event):
-        """
-        Handles 'user.join' events received from the channel layer.
-        This event is broadcast when a user connects to the room.
-        It sends a 'user_join' message to the WebSocket client.
-        """
-        await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "user_join",
-                    "user_id": event["user_id"],
-                    "full_name": event["full_name"],
-                }
-            )
-        )
-
-    async def user_leave(self, event):
-        """
-        Handles 'user.leave' events received from the channel layer.
-        This event is broadcast when a user disconnects from the room.
-        It sends a 'user_leave' message to the WebSocket client.
-        """
-        await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "user_leave",
-                    "user_id": event["user_id"],
-                    "user_full_name": event["full_name"],
-                }
-            )
-        )
 
     async def room_users_list(self, event):
         """
@@ -303,3 +421,121 @@ class GlobalConsumer(AsyncWebsocketConsumer):
         return [
             {"id": str(user["id"]), "full_name": user["full_name"]} for user in users
         ]
+
+    async def set_user_global_online_status(self, is_online):
+        """Set user's global online status in Redis"""
+        status = "online" if is_online else "offline"
+        await self.channel_layer.connection(0).hset(
+            "global_user_status", str(self.user.id), status
+        )
+
+    @database_sync_to_async
+    def get_user_all_rooms(self):
+        """Get all room IDs this user is a member of"""
+        try:
+            from chat.models import ChatMembers
+
+            room_ids = ChatMembers.objects.filter(user_id=self.user).values_list(
+                "room_id__room_id", flat=True
+            )
+            return [str(room_id) for room_id in room_ids]
+        except Exception as e:
+            print(f"Error getting user rooms: {e}")
+        return []
+
+    async def notify_shared_rooms_of_user_status(self, status):
+        """Notify all rooms this user is a member of about their status"""
+        # Get all rooms this user is a member of
+        user_rooms = await self.get_user_all_rooms()
+        for room_id in user_rooms:
+            room_group_name = f"chat_{room_id}"
+            await self.channel_layer.group_send(
+                room_group_name,
+                {
+                    "type": "user.status.changed",
+                    "user_id": str(self.user.id),
+                    "full_name": self.user.full_name,
+                    "status": status,  # "online" or "offline"
+                },
+            )
+
+    async def user_status_changed(self, event):
+        """Handle user status change events"""
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "user_status_changed",
+                    "user_id": event["user_id"],
+                    "full_name": event["full_name"],
+                    "status": event["status"],  # "online" or "offline"
+                }
+            )
+        )
+
+    # ROOM LIST UPDATE METHODS
+
+    async def send_room_list_update_to_members(self, room_obj, message):
+        try:
+            room_members = await self.get_all_room_member_ids(room_obj)
+
+            for user_id in room_members:
+                # Check if user has unread messages (anyone except the sender)
+                has_unread = str(user_id) != str(message.sender.id)
+
+                user_group_name = f"user_{user_id}"
+                await self.channel_layer.group_send(
+                    user_group_name,
+                    {
+                        "type": "room.list.update",
+                        "room_id": str(room_obj.room_id),
+                        "room_name": room_obj.room_name,
+                        "is_dm": room_obj.is_dm,
+                        "has_unread": has_unread,
+                        "latest_message": {
+                            "message_id": str(message.message_id),
+                            "content": message.content,
+                            "sender": {
+                                "id": str(message.sender.id),
+                                "full_name": message.sender.full_name,
+                            },
+                            "sent_at": message.sent_at.isoformat(),
+                            "edited_at": (
+                                message.edited_at.isoformat()
+                                if message.edited_at
+                                else None
+                            ),
+                            "is_deleted": message.is_deleted,
+                            "is_edited": message.is_edited,
+                            "message_type": message.message_type,
+                            "file": str(message.file) if message.file else None,
+                        },
+                    },
+                )
+
+        except Exception as e:
+            print(f"Error sending room list updates: {e}")
+
+            return
+
+    async def room_list_update(self, event):
+        """Handle room list update events"""
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "room_list_update",
+                    "room_id": event["room_id"],
+                    "room_name": event["room_name"],
+                    "is_dm": event["is_dm"],
+                    "has_unread": event["has_unread"],
+                    "latest_message": event["latest_message"],
+                }
+            )
+        )
+
+    @database_sync_to_async
+    def get_all_room_member_ids(self, room_obj):
+        try:
+            member_ids = room_obj.members.values_list("user_id_id", flat=True)
+            return [str(mid) for mid in member_ids]
+        except Exception as e:
+            return []
