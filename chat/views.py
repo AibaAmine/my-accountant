@@ -11,6 +11,7 @@ from .serializers import (
     ChatMessageUpdateSerializer,
     ChatMessageDeleteSerializer,
     ChatFileUploadSerializer,
+    DirectMessageRoomSerializer,
 )
 from .models import ChatRooms, ChatMessages, ChatMembers, UserRoomLastSeen
 from rest_framework.permissions import IsAuthenticated
@@ -102,7 +103,7 @@ class GroupChatRoomListAPIView(generics.ListAPIView):
 
 # user Direct Message Rooms
 class DirectMessageRoomListAPIView(generics.ListAPIView):
-    serializer_class = ChatRoomSerializer
+    serializer_class = DirectMessageRoomSerializer
     permission_classes = [IsAuthenticated]
 
     def get_serializer_context(self):
@@ -114,20 +115,15 @@ class DirectMessageRoomListAPIView(generics.ListAPIView):
         user = self.request.user
         return (
             ChatRooms.objects.filter(members__user_id=user, is_dm=True)
-            .select_related("creator")
             .prefetch_related(
                 Prefetch(
                     "user_last_seen",
                     queryset=UserRoomLastSeen.objects.filter(user=user),
                     to_attr="prefetched_user_last_seen",
-                )
+                ),
             )
-            .annotate(
-                message_count_annotated=Count("messages"),
-                members_count_annotated=Count("members"),
-                last_message_time=models.Max("messages__sent_at"),
-            )
-            .order_by("-last_message_time")
+            .distinct()
+            .order_by("-messages__sent_at")
         )
 
 
