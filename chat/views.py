@@ -12,6 +12,7 @@ from .serializers import (
     ChatMessageDeleteSerializer,
     ChatFileUploadSerializer,
     DirectMessageRoomSerializer,
+    ChatRoomListSerializer,
 )
 from .models import ChatRooms, ChatMessages, ChatMembers, UserRoomLastSeen
 from rest_framework.permissions import IsAuthenticated
@@ -65,7 +66,7 @@ class AvailableUserListAPIView(generics.ListAPIView):
 
 # user Group Chat Rooms
 class GroupChatRoomListAPIView(generics.ListAPIView):
-    serializer_class = ChatRoomSerializer
+    serializer_class = ChatRoomListSerializer
     permission_classes = [IsAuthenticated]
 
     # add the request obj to the serializer

@@ -99,7 +99,7 @@ class DirectMessageRoomSerializer(serializers.ModelSerializer):
         )
 
 
-class ChatRoomSerializer(serializers.ModelSerializer):
+class ChatRoomListSerializer(serializers.ModelSerializer):
     creator = CustomUserDetailsSerializer(read_only=True)
     message_count = serializers.SerializerMethodField()
     members_count = serializers.SerializerMethodField()
@@ -197,6 +197,42 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             .exclude(sender=user)
             .exists()
         )
+
+
+class ChatRoomSerializer(serializers.ModelSerializer):
+
+    creator = CustomUserDetailsSerializer(read_only=True)
+    message_count = serializers.SerializerMethodField()
+    members_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatRooms
+        fields = [
+            "room_id",
+            "creator",
+            "room_name",
+            "created_at",
+            "description",
+            "is_private",
+            "is_dm",
+            "members_count",
+            "message_count",
+        ]
+        read_only_fields = [
+            "room_id",
+            "creator",
+            "created_at",
+            "is_private",
+            "is_dm",
+            "members_count",
+            "message_count",
+        ]
+
+    def get_message_count(self, obj):
+        return getattr(obj, "message_count_annotated", obj.messages.count())
+
+    def get_members_count(self, obj):
+        return getattr(obj, "members_count_annotated", obj.members.count())
 
 
 class ChatRoomCreateSerializer(serializers.ModelSerializer):
