@@ -44,7 +44,14 @@ class DirectMessageRoomSerializer(serializers.ModelSerializer):
 
     def get_latest_message(self, obj):
         """Get the most recent message in the room"""
-        latest_msg = obj.messages.order_by("-sent_at").first()
+        prefetched_messages = getattr(obj, "prefetched_latest_message", None)
+
+        if prefetched_messages is not None:
+            latest_msg = prefetched_messages[0] if prefetched_messages else None
+
+        else:
+            # Fallback
+            latest_msg = obj.messages.order_by("-sent_at").first()
         if latest_msg:
             return {
                 "message_id": str(latest_msg.message_id),
@@ -135,7 +142,15 @@ class ChatRoomSerializer(serializers.ModelSerializer):
 
     def get_latest_message(self, obj):
         """Get the most recent message in the room"""
-        latest_msg = obj.messages.order_by("-sent_at").first()
+
+        prefetched_messages = getattr(obj, "prefetched_latest_message", None)
+
+        if prefetched_messages is not None:
+            latest_msg = prefetched_messages[0] if prefetched_messages else None
+
+        else:
+            # Fallback
+            latest_msg = obj.messages.order_by("-sent_at").first()
         if latest_msg:
             return {
                 "message_id": str(latest_msg.message_id),

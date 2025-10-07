@@ -28,7 +28,7 @@ from django.db import models
 from accounts.models import User
 from accounts.serializers import CustomUserDetailsSerializer
 
-from django.db.models import Prefetch, Count
+from django.db.models import Prefetch, Count, OuterRef, Subquery
 
 User = get_user_model()
 
@@ -89,7 +89,12 @@ class GroupChatRoomListAPIView(generics.ListAPIView):
                     "user_last_seen",
                     queryset=UserRoomLastSeen.objects.filter(user=user),
                     to_attr="prefetched_user_last_seen",
-                )
+                ),
+                Prefetch(
+                    "messages",
+                    queryset=ChatMessages.objects.order_by("-sent_at")[:1],
+                    to_attr="prefetched_latest_message",
+                ),
             )
             .annotate(
                 # Annotate counts to avoid N+1 queries
@@ -97,6 +102,7 @@ class GroupChatRoomListAPIView(generics.ListAPIView):
                 members_count_annotated=Count("members"),
                 last_message_time=models.Max("messages__sent_at"),
             )
+            .distinct()
             .order_by("-last_message_time")
         )
 
@@ -113,6 +119,14 @@ class DirectMessageRoomListAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+
+        # Subquery to get the latest message sent_at for each room
+        latest_message_subquery = (
+            ChatMessages.objects.filter(room=OuterRef("pk"))
+            .order_by("-sent_at")
+            .values("sent_at")[:1]
+        )
+
         return (
             ChatRooms.objects.filter(members__user_id=user, is_dm=True)
             .prefetch_related(
@@ -121,9 +135,22 @@ class DirectMessageRoomListAPIView(generics.ListAPIView):
                     queryset=UserRoomLastSeen.objects.filter(user=user),
                     to_attr="prefetched_user_last_seen",
                 ),
+                "members__user_id",  # Prefetch members and their users
+                Prefetch(
+                    "messages",
+                    queryset=ChatMessages.objects.order_by("-sent_at")[:1],
+                    to_attr="prefetched_latest_message",
+                ),
             )
+            .annotate(latest_message_time=models.Max("messages__sent_at"))
+            # models.Max("messages__sent_at") similar to this query : # Subquery to get the latest message sent_at for each room
+            # latest_message_subquery = (
+            #     ChatMessages.objects.filter(room=OuterRef("pk"))
+            #     .order_by("-sent_at")
+            #     .values("sent_at")[:1]
+            # )
             .distinct()
-            .order_by("-messages__sent_at")
+            .order_by("-latest_message_time")
         )
 
 
