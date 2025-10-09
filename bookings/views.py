@@ -16,6 +16,8 @@ from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from .models import Booking
 
+from notifications.models import Notification
+
 
 class CreateBookingAPIView(generics.CreateAPIView):
     serializer_class = BookingCreateSerializer
@@ -25,7 +27,17 @@ class CreateBookingAPIView(generics.CreateAPIView):
     def perform_create(self, serializer):
         user = self.request.user
 
-        serializer.save()
+        booking = serializer.save()
+ 
+ 
+        Notification.objects.create(
+            user=booking.service.user,
+            notification_type="booking_created",
+            title="New Booking Request",
+            message=f"{self.request.user.get_full_name()} booked your {booking.service.title} service ",
+            related_object_id=booking.booking_id,
+        )
+
 
 
 class UpdateBookingAPIView(generics.UpdateAPIView):

@@ -410,7 +410,7 @@ class RoomMessageListAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     pagination_class = PageNumberPagination
     page_size = 20
-    ordering = ["-sent_at"]
+    ordering = ["sent_at"]
     filter_backends = [SearchFilter]
     search_fields = ["content"]
 

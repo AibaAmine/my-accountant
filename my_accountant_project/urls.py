@@ -92,6 +92,7 @@ urlpatterns = [
     path("", include("bookings.urls")),
     path("services/", include("services.urls")),
     path("chat/", include("chat.urls")),
+    path("notifications/",include("notifications.urls"))
 ]
 
 # Serve media files during development
