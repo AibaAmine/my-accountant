@@ -410,7 +410,7 @@ class RoomMessageListAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     pagination_class = PageNumberPagination
     page_size = 20
-    ordering = ["sent_at"]
+    ordering = ["-sent_at"]
     filter_backends = [SearchFilter]
     search_fields = ["content"]
 
@@ -421,7 +421,7 @@ class RoomMessageListAPIView(generics.ListAPIView):
         if not room.members.filter(user_id=self.request.user).exists():
             raise PermissionDenied("You are not a member of this room.")
 
-        return room.messages.all()
+        return room.messages.all().order_by("-sent_at")
 
 
 class RoomMembersCountAPIView(views.APIView):
