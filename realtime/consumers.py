@@ -1,3 +1,5 @@
+from notifications.models import Notification
+from notifications.utils import send_notification_to_user
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import AnonymousUser
@@ -98,7 +100,9 @@ class GlobalConsumer(AsyncWebsocketConsumer):
     async def chat_message(self, event):
         # Send message object directly to WebSocket
         await self.send(
-            text_data=json.dumps({"type": "chat_message", "message": event["message"]})
+            text_data=json.dumps({
+                "type": "chat_message", "message": event["message"]},ensure_ascii=False
+)
         )
 
     # handler for room join message
@@ -255,6 +259,9 @@ class GlobalConsumer(AsyncWebsocketConsumer):
 
             # Send room list update to ALL room members
             await self.send_room_list_update_to_members(room_obj, created_msg)
+            
+            await self.create_message_notifications(room_obj, created_msg)
+
 
         except Exception as e:
             print(f"Error processing message: {e}")
@@ -539,3 +546,87 @@ class GlobalConsumer(AsyncWebsocketConsumer):
             return [str(mid) for mid in member_ids]
         except Exception as e:
             return []
+        
+        
+
+    #notification event handler
+    async def new_notification(self, event):
+        """Handle new notification events"""
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "new_notification",
+                    "notification_id": event["notification_id"],
+                    "notification_type": event["notification_type"],
+                    "title": event["title"],
+                    "message": event["message"],
+                    "related_object_id": event["related_object_id"],
+                    "created_at": event["created_at"],
+                    "is_read": event["is_read"],
+                },
+                 ensure_ascii=False  
+
+            )
+        )
+        
+    
+    async def create_message_notifications(self, room_obj, message):
+        """Create message notifications for all room members except sender"""
+        
+        try:
+            room_members = await self.get_all_room_member_ids(room_obj)
+            
+            for user_id in room_members:
+                if str(user_id) == str(message.sender.id):
+                    continue
+                
+                # Create notification for this user
+                notification = await self.create_notification(
+                    user_id=user_id,
+                    sender_name=message.sender.full_name,
+                    room_name=room_obj.room_name,
+                    message_content=message.content,
+                    room_id=str(room_obj.room_id)
+                )
+                
+                if notification:
+                    print("there is notification created when sending msg")
+                    await self.send_notification_sync(notification)
+                    
+        except Exception as e:
+            print(f"Error creating message notifications: {e}")
+
+    @database_sync_to_async
+    def create_notification(self, user_id, sender_name, room_name, message_content, room_id):
+        """Create notification in database"""
+        from notifications.models import Notification
+        from django.contrib.auth import get_user_model
+        
+        try:
+            User = get_user_model()
+            user = User.objects.get(id=user_id)
+            
+            # Truncate message if too long
+            preview = message_content[:50] + "..." if len(message_content) > 50 else message_content
+            
+            notification = Notification.objects.create(
+                user=user,
+                notification_type="message",
+                title=f"New message from {sender_name}",
+                message=f"{sender_name} in {room_name}: {preview}",
+                related_object_id=room_id,
+            )
+            return notification
+        except Exception as e:
+            print(f"Error creating notification: {e}")
+            return None
+    
+    @database_sync_to_async
+    def send_notification_sync(self, notification):
+        """Send notification via WebSocket (sync wrapper)"""
+        from notifications.utils import send_notification_to_user
+        send_notification_to_user(notification)
+
+
+
+

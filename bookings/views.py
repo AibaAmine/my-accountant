@@ -17,6 +17,8 @@ from rest_framework.exceptions import PermissionDenied
 from .models import Booking
 
 from notifications.models import Notification
+from notifications.utils import send_notification_to_user
+
 
 
 class CreateBookingAPIView(generics.CreateAPIView):
@@ -30,13 +32,17 @@ class CreateBookingAPIView(generics.CreateAPIView):
         booking = serializer.save()
  
  
-        Notification.objects.create(
+        notification=Notification.objects.create(
             user=booking.service.user,
             notification_type="booking_created",
             title="New Booking Request",
-            message=f"{self.request.user.get_full_name()} booked your {booking.service.title} service ",
+            message=f"{self.request.user.full_name} booked your {booking.service.title} service ",
             related_object_id=booking.booking_id,
         )
+        
+        send_notification_to_user(notification=notification)
+        
+        
 
 
 
@@ -126,6 +132,18 @@ class AcceptBookingAPIView(views.APIView):
         # Accept the booking
         booking.status = "confirmed"
         booking.save()
+        
+        
+        notification = Notification.objects.create(
+            user=booking.client,
+            notification_type="booking_accepted",
+            title="Booking Confirmed",
+            message=f"Your booking for {booking.service.title} has been confirmed",
+            related_object_id=booking.booking_id,
+        )
+        send_notification_to_user(notification)
+        
+        
 
         return Response(
             {
@@ -171,6 +189,15 @@ class DeclineBookingAPIView(views.APIView):
 
         booking.status = "declined"
         booking.save()
+        
+        notification = Notification.objects.create(
+            user=booking.client,
+            notification_type="booking_declined",
+            title="Booking Declined",
+            message=f"Your booking for {booking.service.title} has been declined",
+            related_object_id=booking.booking_id,
+        )
+        send_notification_to_user(notification)
 
         return Response(
             {

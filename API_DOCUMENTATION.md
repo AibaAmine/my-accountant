@@ -2618,6 +2618,342 @@ When a file is uploaded via the REST API (`POST /chat/rooms/{room_id}/upload_fil
 
 ---
 
+## 11. Notifications System
+
+The platform provides a real-time notification system for important events like booking updates. Notifications are delivered via both REST APIs and WebSocket for instant updates.
+
+### Notification Types
+
+| Type               | Description                        | Triggered When                      |
+| ------------------ | ---------------------------------- | ----------------------------------- |
+| `booking_created`  | New booking request received       | Someone books your service          |
+| `booking_accepted` | Booking confirmed by service owner | Service owner accepts your booking  |
+| `booking_declined` | Booking declined by service owner  | Service owner declines your booking |
+| `message`          | New message received               | Someone sends you a chat message    |
+
+### REST API Endpoints
+
+#### Get Notifications List 🔒
+
+**Endpoint:** `GET /notifications/`
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Retrieves paginated list of all notifications for the authenticated user, ordered by newest first.
+
+**Query Parameters:**
+
+- `page`: Page number (default: 1, page size: 20)
+
+**Response (Success - 200):**
+
+```json
+{
+  "count": 45,
+  "next": "https://api.example.com/notifications/?page=2",
+  "previous": null,
+  "results": [
+    {
+      "notification_id": "uuid-here",
+      "notification_type": "booking_created",
+      "title": "New Booking Request",
+      "message": "John Doe booked your Tax Preparation service",
+      "is_read": false,
+      "related_object_id": "booking-uuid-here",
+      "created_at": "2025-01-15T10:30:00Z"
+    },
+    {
+      "notification_id": "uuid-here",
+      "notification_type": "booking_accepted",
+      "title": "Booking Confirmed",
+      "message": "Your booking for Tax Preparation has been confirmed",
+      "is_read": true,
+      "related_object_id": "booking-uuid-here",
+      "created_at": "2025-01-14T14:20:00Z"
+    },
+    {
+      "notification_id": "uuid-here",
+      "notification_type": "booking_declined",
+      "title": "Booking Declined",
+      "message": "Your booking for Tax Preparation has been declined",
+      "is_read": false,
+      "related_object_id": "booking-uuid-here",
+      "created_at": "2025-01-14T09:15:00Z"
+    },
+    {
+      "notification_id": "uuid-here",
+      "notification_type": "message",
+      "title": "New message from Jane Smith",
+      "message": "Jane Smith in Tax Discussion: Can we schedule a call tomorrow?",
+      "is_read": false,
+      "related_object_id": "room-uuid-here",
+      "created_at": "2025-01-13T16:45:00Z"
+    }
+  ]
+}
+```
+
+---
+
+#### Get Notification Details 🔒
+
+**Endpoint:** `GET /notifications/{notification_id}/`
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Retrieve detailed information about a specific notification. Only the notification owner can access it.
+
+**Response Examples:**
+
+**Booking Created Notification:**
+
+```json
+{
+  "notification_id": "uuid-here",
+  "notification_type": "booking_created",
+  "title": "New Booking Request",
+  "message": "John Doe booked your Tax Preparation service",
+  "is_read": false,
+  "related_object_id": "booking-uuid-here",
+  "created_at": "2025-01-15T10:30:00Z"
+}
+```
+
+**Booking Accepted Notification:**
+
+```json
+{
+  "notification_id": "uuid-here",
+  "notification_type": "booking_accepted",
+  "title": "Booking Confirmed",
+  "message": "Your booking for Tax Preparation has been confirmed",
+  "is_read": true,
+  "related_object_id": "booking-uuid-here",
+  "created_at": "2025-01-14T14:20:00Z"
+}
+```
+
+**Booking Declined Notification:**
+
+```json
+{
+  "notification_id": "uuid-here",
+  "notification_type": "booking_declined",
+  "title": "Booking Declined",
+  "message": "Your booking for Tax Preparation has been declined",
+  "is_read": false,
+  "related_object_id": "booking-uuid-here",
+  "created_at": "2025-01-14T09:15:00Z"
+}
+```
+
+**Message Notification:**
+
+```json
+{
+  "notification_id": "uuid-here",
+  "notification_type": "message",
+  "title": "New message from Jane Smith",
+  "message": "Jane Smith in Tax Discussion: Can we schedule a call tomorrow?",
+  "is_read": false,
+  "related_object_id": "room-uuid-here",
+  "created_at": "2025-01-13T16:45:00Z"
+}
+```
+
+**Response (Error - 404):**
+
+```json
+{
+  "detail": "Not found."
+}
+```
+
+---
+
+#### Get Unread Count 🔒
+
+**Endpoint:** `GET /notifications/unread-count/`
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Get the count of unread notifications for displaying badges.
+
+**Response (Success - 200):**
+
+```json
+{
+  "unread_count": 5
+}
+```
+
+---
+
+#### Mark Notification as Read 🔒
+
+**Endpoint:** `POST /notifications/{notification_id}/mark-read/`
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Mark a specific notification as read. Only the notification owner can mark it as read.
+
+**Response (Success - 200):**
+
+```json
+{
+  "notification_id": "uuid-here",
+  "is_read": true,
+  "message": "Notification marked as read successfully"
+}
+```
+
+**Response (Already Read - 200):**
+
+```json
+{
+  "notification_id": "uuid-here",
+  "is_read": true,
+  "message": "Notification was already marked as read"
+}
+```
+
+---
+
+#### Mark All as Read 🔒
+
+**Endpoint:** `POST /notifications/mark-all-read/`
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Description:** Mark all unread notifications as read for the authenticated user.
+
+**Response (Success - 200):**
+
+```json
+{
+  "message": "12 notification marked as read",
+  "marked_count": 12,
+  "unread_count": 0
+}
+```
+
+---
+
+### Real-time Notifications via WebSocket
+
+Notifications are sent in real-time through the **Global WebSocket** connection (`ws://your-domain/ws/global/`). The same WebSocket connection used for chat also delivers notifications.
+
+#### New Notification Event
+
+Received when a new notification is created for you.
+
+**Event Examples:**
+
+**Booking Created Event:**
+
+```json
+{
+  "type": "new_notification",
+  "notification_id": "d0020a19-09bf-4550-b960-bbe13ad16316",
+  "notification_type": "booking_created",
+  "title": "New Booking Request",
+  "message": "John Doe booked your Tax Preparation service",
+  "related_object_id": "89797ee0-94f7-4cc6-9c15-a17a292c1a1b",
+  "created_at": "2025-10-12T17:08:57.743228+00:00",
+  "is_read": false
+}
+```
+
+**Booking Accepted Event:**
+
+```json
+{
+  "type": "new_notification",
+  "notification_id": "uuid-here",
+  "notification_type": "booking_accepted",
+  "title": "Booking Confirmed",
+  "message": "Your booking for Tax Preparation has been confirmed",
+  "related_object_id": "booking-uuid-here",
+  "created_at": "2025-10-12T18:30:00.000000+00:00",
+  "is_read": false
+}
+```
+
+**Booking Declined Event:**
+
+```json
+{
+  "type": "new_notification",
+  "notification_id": "uuid-here",
+  "notification_type": "booking_declined",
+  "title": "Booking Declined",
+  "message": "Your booking for Tax Preparation has been declined",
+  "related_object_id": "booking-uuid-here",
+  "created_at": "2025-10-12T19:15:00.000000+00:00",
+  "is_read": false
+}
+```
+
+**Message Event:**
+
+```json
+{
+  "type": "new_notification",
+  "notification_id": "uuid-here",
+  "notification_type": "message",
+  "title": "New message from Jane Smith",
+  "message": "Jane Smith in Tax Discussion: Can we schedule a call tomorrow?",
+  "related_object_id": "room-uuid-here",
+  "created_at": "2025-10-12T20:45:00.000000+00:00",
+  "is_read": false
+}
+```
+
+**Field Descriptions:**
+
+- `notification_id`: Unique identifier for the notification
+- `notification_type`: Type of notification (see Notification Types table)
+- `title`: Short notification title
+- `message`: Detailed notification message
+- `related_object_id`: ID of the related object (booking_id, message_id, etc.)
+- `created_at`: Timestamp when notification was created
+- `is_read`: Always `false` for new notifications
+
+---
+
+### Implementation Flow
+
+**1. On App Start:**
+
+- Fetch existing notifications: `GET /notifications/list/`
+- Get unread count: `GET /notifications/unread-count/`
+- Connect to WebSocket: `ws://your-domain/ws/global/`
+
+**2. On New Notification (WebSocket):**
+
+- Receive `new_notification` event
+- Add notification to local list at the top
+- Increment unread count by 1
+- Display notification banner/toast to user
+- Update notification badge
+
+**3. On User Taps Notification:**
+
+- Call: `POST /notifications/{notification_id}/mark-read/`
+- Update local notification: `is_read = true`
+- Decrement unread count by 1
+- Navigate to related object (booking, message, etc.)
+
+**4. On Mark All as Read:**
+
+- Call: `POST /notifications/mark-all-read/`
+- Update all local notifications: `is_read = true`
+- Set unread count to 0
+
+**Best Practice:** Update local state after API calls instead of refetching the entire notification list for better performance.
+
+---
+
 ## Error Codes and Messages
 
 ### Common HTTP Status Codes
@@ -2804,6 +3140,8 @@ When a file is uploaded via the REST API (`POST /chat/rooms/{room_id}/upload_fil
 - Both participants can update booking information (name, LinkedIn, CV, notes)
 
 **Note**: Academic users cannot participate in the booking system as they don't have access to the service marketplace.
+
+---
 
 ### Logout Flow
 

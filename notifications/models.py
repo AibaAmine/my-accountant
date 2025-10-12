@@ -4,17 +4,16 @@ from accounts.models import User
 
 # Create your models here.
 
-
 class Notification(models.Model):
-
+    
     notification_id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
         editable=False,
     )
-
+    
     NOTIFICATION_TYPE = [
-        ("booking_created", "New Booking Request"),
+        ("booking_created","New Booking Request"),
         ("booking_accepted", "Booking Confirmed"),
         ("booking_declined", "Booking Declined"),
         ("message", "New Message"),

@@ -17,6 +17,16 @@ class NotificationListAPIView(generics.ListAPIView):
         return Notification.objects.filter(user=self.request.user)
 
 
+class NotificationDetailAPIView(generics.RetrieveAPIView):
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "notification_id"
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user)
+
+
+
 class NotificationMarkReadAPIView(generics.UpdateAPIView):
     lookup_field = "notification_id"
     permission_classes = [IsAuthenticated]
@@ -53,6 +63,7 @@ class NotificationMarkReadAPIView(generics.UpdateAPIView):
                 "message": "Notification marked as read successfully",
             }
         )
+        
 
 
 class NotificationUnreadCountAPIView(APIView):
