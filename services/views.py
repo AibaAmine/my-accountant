@@ -3,8 +3,10 @@ from .serializers import (
     ServiceDetailSerializer,
     AccountantServiceDetailSerializer,
     ClientServiceDetailSerializer,
+    CourseDetailSerializer,
     ServiceCreateSerializer,
     ServiceUpdateSerializer,
+    
 )
 from .category_serializers import (
     ServiceCategorySerializer,
@@ -138,13 +140,24 @@ class PublicServiceListAPIView(generics.ListAPIView):
         role = (getattr(user, "user_type", "") or "").lower()
         if role == "client":
             return Service.objects.filter(
-                is_active=True, service_type="offered"
+                is_active=True, 
+                service_type="offered",
+                is_course=False
             ).exclude(user=user)
 
         if role == "accountant":
             return Service.objects.filter(
-                is_active=True, service_type="needed"
+                is_active=True,
+                service_type="needed"
             ).exclude(user=user)
+            
+        if role =="academic":
+            return Service.objects.filter(
+                is_active = True ,
+                service_type="offered",
+                is_course=True
+            ).exclude(user=user)
+            
         return Service.objects.none()
 
 
@@ -155,13 +168,17 @@ class PublicServiceDetailAPIView(generics.RetrieveAPIView):
     def get_serializer_class(self):
 
         service = self.get_object()
+        
+        
+        if service.is_course: 
+          return CourseDetailSerializer
 
-        if service.service_type == "offered":
-
+        elif service.service_type == "offered":
             return AccountantServiceDetailSerializer
+        
         elif service.service_type == "needed":
-
             return ClientServiceDetailSerializer
+        
         return ServiceDetailSerializer
 
     def get_queryset(self):
@@ -170,18 +187,35 @@ class PublicServiceDetailAPIView(generics.RetrieveAPIView):
 
         if role == "client":
             return (
-                Service.objects.filter(is_active=True, service_type="offered")
+                Service.objects.filter(
+                    is_active=True, 
+                    service_type="offered",
+                    is_course = False
+                    )
                 .select_related("user")
                 .prefetch_related("categories")
                 .exclude(user=user)
             )
         if role == "accountant":
             return (
-                Service.objects.filter(is_active=True, service_type="needed")
+                Service.objects.filter(is_active=True,
+                                       service_type="needed")
                 .select_related("user")
                 .prefetch_related("categories")
                 .exclude(user=user)
             )
+            
+        if role == "academic":
+            return(
+                Service.objects.filter(
+                    is_active=True,
+                    service_type="offered",  
+                    is_course=True,
+                  )  .select_related("user")
+                .prefetch_related("categories")
+                .exclude(user=user)
+                                       )
+            
         return None
 
 

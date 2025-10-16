@@ -2,7 +2,22 @@
 
 ## Overview
 
-This documentation covers all APIs for the My Accountant platform, including authentication, user management, profile management, services marketplace, and booking system. The platform uses JWT (JSON Web Tokens) for authentication and supports email-based registration with OTP verification, social login (Google/Facebook), password reset, and comprehensive role-based service management.
+This documentation covers all APIs for the My Accountant platform, including authentication, user management, profile management, services marketplace, booking system, and course management. The platform uses JWT (JSON Web Tokens) for authentication and supports email-based registration with OTP verification, social login (Google/Facebook), password reset, and comprehensive role-based service management.
+
+### Platform Features
+
+- **Service Marketplace**: Clients request services, accountants offer services
+- **Course System**: Accountants create courses, academics book and enroll in courses
+- **Booking System**: Role-based booking flows for services and courses
+- **Real-time Chat**: WebSocket-based messaging with role-based access
+- **Notifications**: Real-time notifications for bookings and messages
+
+### User Roles
+
+- **Client**: Books regular services from accountants
+- **Accountant**: Offers services and courses, manages bookings
+- **Academic**: Browses and books courses, participates in course chat groups
+- **Admin**: Full platform management
 
 ## Base URL
 
@@ -763,12 +778,13 @@ Content-Type: multipart/form-data
 
 **Request Body (Form Data):**
 
-**Example for Accountants (Offering Services):**
+**Example for Accountants (Offering Regular Services):**
 
 ```json
 {
   "title": "Tax Declaration Preparation (IRG, TVA, IBS)",
   "description": "I offer monthly tax declaration preparation services for companies and traders including:\n• Individual Income Tax (IRG)\n• Value Added Tax (TVA)\n• Corporate Income Tax (IBS)\nI analyze documents, calculate due amounts, and fill declarations according to Algerian tax laws.",
+  "is_course": false,
   "categories": ["uuid1", "uuid2"],
   "location": "16",
   "estimated_duration": 2,
@@ -780,6 +796,30 @@ Content-Type: multipart/form-data
   "upload_files": [file1, file2, file3]
 }
 ```
+
+**Example for Accountants (Creating Courses):**
+
+```json
+{
+  "title": "Accounting Fundamentals Course",
+  "description": "Learn the basics of accounting in 8 weeks. This comprehensive course covers bookkeeping, financial statements, tax preparation, and practical exercises. Perfect for beginners wanting to start a career in accounting.",
+  "is_course": true,
+  "categories": ["uuid1"],
+  "location": "online",
+  "estimated_duration": 8,
+  "duration_unit": "weeks",
+  "estimated_duration_description": "8 weeks with weekly 2-hour sessions",
+  "price": 15000,
+  "price_description": "15000 DZD for the complete 8-week course",
+  "delivery_method": "online",
+  
+}
+```
+
+**Important Note for Accountants:**
+- **Regular Services**: Set `is_course: false` or omit the field (defaults to false)
+- **Courses**: **Must** set `is_course: true` to create a course for academics
+- Courses will only be visible to academic users, regular services only to clients
 
 **Multiple File Upload:**
 
@@ -1099,6 +1139,8 @@ Content-Type: multipart/form-data
 
 **Description:** Updates a service owned by the user. Only active services can be updated.
 
+**Important Note:** The `is_course` field is **read-only** after creation. You cannot change a regular service to a course or vice versa.
+
 **Request Body (PATCH example):**
 
 For regular updates (JSON):
@@ -1145,8 +1187,9 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
 
 **Description:** Browse services available to the authenticated user based on their role:
 
-- **Clients**: See "offered" services (services provided by accountants)
+- **Clients**: See "offered" services where `is_course: false` (regular services provided by accountants)
 - **Accountants**: See "needed" services (services requested by clients)
+- **Academics**: See "offered" services where `is_course: true` (courses provided by accountants)
 
 **Query Parameters:**
 
@@ -1247,9 +1290,10 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
 
 ## 10. Bookings Management
 
-The booking system enables clients and accountants to create, manage, and interact with service bookings. The system supports two main booking flows based on service types:
+The booking system enables clients, academics, and accountants to create, manage, and interact with service bookings. The system supports three main booking flows based on service types and user roles:
 
-- **Offered Services**: Clients book accountants' offered services
+- **Offered Services (Regular)**: Clients book accountants' regular services 
+- **Offered Services (Courses)**: Academics book accountants' courses 
 - **Needed Services**: Accountants propose to fulfill clients' needed services
 
 ### 1. Booking Creation
@@ -1266,15 +1310,16 @@ The booking system enables clients and accountants to create, manage, and intera
 
 **Role-Based Booking Types:**
 
-- **Clients booking Offered Services**: Only clients can book services offered by accountants
+- **Clients booking Regular Services**: Only clients can book regular services (`is_course: false`) offered by accountants
+- **Academics booking Courses**: Only academics can book courses (`is_course: true`) offered by accountants
 - **Accountants proposing to Needed Services**: Only accountants can propose to fulfill services needed by clients
 - **Validation**: Users cannot book/propose to their own services
 
-**Request Body:**
+**Request Body for Clients (Regular Service Booking):**
 
 ```json
 {
-  "service": "uuid-of-service",
+  "service": "uuid-of-regular-service",
   "full_name": "John Doe",
   "linkedin_url": "https://linkedin.com/in/johndoe",
   "cv_file": "file_upload",
@@ -1282,15 +1327,40 @@ The booking system enables clients and accountants to create, manage, and intera
 }
 ```
 
+**Request Body for Academics (Course Booking):**
+
+```json
+{
+  "service": "uuid-of-course",
+  "full_name": "Sarah Academic",
+  "additional_notes": "I'm excited to learn accounting fundamentals. I have basic math knowledge and available for all sessions.",
+  "cv_file": "file_upload",
+}
+```
+
 **Fields:**
 
-- **service** (required): UUID of the service to book/propose
+- **service** (required): UUID of the service/course to book
 - **full_name** (required): Full name of the person booking
 - **linkedin_url** (optional): LinkedIn profile URL
-- **cv_file** (optional): CV/resume file upload
+- **cv_file** (optional for courses, optional for services): CV/resume file upload
+  - **For course bookings**: CV is optional (academics don't need to provide CV)
+  - **For service bookings**: CV is optional but recommended
 - **additional_notes** (optional): Any additional information or requirements
 
+**Key Differences:**
+
+| Field              | Client Booking Service | Academic Booking Course |
+| ------------------ | ---------------------- | ----------------------- |
+| `service`          | Required               | Required                |
+| `full_name`        | Required               | Required                |
+| `linkedin_url`     | Optional               | Optional                |
+| `cv_file`          | Optional               | Optional                |
+| `additional_notes` | Optional               | Optional                |
+
 **Response (Success - 201):**
+
+**Example for Client Booking Service:**
 
 ```json
 {
@@ -1326,6 +1396,7 @@ The booking system enables clients and accountants to create, manage, and intera
       "user_type": "accountant"
     },
     "service_type": "offered",
+    "is_course": false,
     "title": "Professional Tax Filing Service",
     "description": "Comprehensive tax filing services for individuals and small businesses...",
     "categories": [
@@ -1354,6 +1425,71 @@ The booking system enables clients and accountants to create, manage, and intera
 }
 ```
 
+**Example for Academic Booking Course:**
+
+```json
+{
+  "booking_id": "uuid-here",
+  "client": {
+    "pk": "uuid-here",
+    "email": "academic@example.com",
+    "full_name": "Sarah Academic",
+    "user_type": "academic",
+    "phone": "+1234567892",
+    "is_email_verified": true,
+    "account_status": "active",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
+  },
+  "accountant": {
+    "pk": "uuid-here",
+    "email": "accountant@example.com",
+    "full_name": "Jane Smith",
+    "user_type": "accountant",
+    "phone": "+1234567891",
+    "is_email_verified": true,
+    "account_status": "active",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
+  },
+  "service": {
+    "id": "uuid-here",
+    "user": {
+      "pk": "uuid-here",
+      "email": "accountant@example.com",
+      "full_name": "Jane Smith",
+      "user_type": "accountant"
+    },
+    "service_type": "offered",
+    "is_course": true,
+    "title": "Accounting Fundamentals Course",
+    "description": "Learn the basics of accounting in 8 weeks...",
+    "categories": [
+      {
+        "id": "uuid-here",
+        "name": "Education"
+      }
+    ],
+    "price": "15000.00",
+    "estimated_duration": 8,
+    "duration_unit": "weeks",
+    "delivery_method": "online",
+    "location": "online",
+    "is_active": true,
+    "is_featured": false,
+    "created_at": "2025-01-01T10:00:00Z",
+    "updated_at": "2025-01-01T10:00:00Z"
+  },
+  "full_name": "Sarah Academic",
+  "linkedin_url": "https://linkedin.com/in/sarahacademic",
+  "cv_file": null,
+  "additional_notes": "I'm excited to learn accounting fundamentals. I have basic math knowledge...",
+  "status": "pending",
+  "created_at": "2025-01-01T12:00:00Z",
+  "updated_at": "2025-01-01T12:00:00Z"
+}
+```
+
 **Response (Error - 400):**
 
 ```json
@@ -1361,6 +1497,12 @@ The booking system enables clients and accountants to create, manage, and intera
   "service": ["This field is required."],
   "full_name": ["This field is required."],
   "non_field_errors": ["Only a client can book an offered service."]
+}
+```
+
+```json
+{
+  "non_field_errors": ["Only academics can book courses."]
 }
 ```
 
@@ -1380,10 +1522,11 @@ The booking system enables clients and accountants to create, manage, and intera
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Retrieves all bookings for the authenticated user (as client or accountant). Results are filtered based on user type:
+**Description:** Retrieves all bookings for the authenticated user. Results are filtered based on user type:
 
-- **Clients**: See bookings where they are the client
-- **Accountants**: See bookings where they are the accountant
+- **Clients**: See bookings where they are the client (regular service bookings)
+- **Academics**: See bookings where they are the client and service is a course (course bookings only)
+- **Accountants**: See bookings where they are the accountant (both service and course bookings)
 
 **Response (Success - 200):**
 
@@ -3081,14 +3224,17 @@ Received when a new notification is created for you.
 
 **Role-Based Service Creation:**
 
-1. **Clients**: Create "needed" services (requesting help) → `POST /services/create/`
-2. **Accountants**: Create "offered" services (providing help) → `POST /services/create/`
-3. **Academic users**: Limited access to service marketplace
+1. **Clients**: Create "needed" services (requesting help) → `POST /services/create/` with `is_course: false` or omit field
+2. **Accountants**: 
+   - Create "offered" regular services → `POST /services/create/` with `is_course: false` or omit field
+   - Create "offered" courses → `POST /services/create/` with **`is_course: true`** (required)
+3. **Academic users**: Cannot create services, can only browse and book courses
 
 **Service Discovery:**
 
-1. **Clients**: Browse "offered" services → `GET /services/browse/` (see accountant services)
-2. **Accountants**: Browse "needed" services → `GET /services/browse/` (see client requests)
+1. **Clients**: Browse "offered" regular services → `GET /services/browse/` (see accountant services)
+2. **Academics**: Browse "offered" courses → `GET /services/browse/` (see accountant courses)
+3. **Accountants**: Browse "needed" services → `GET /services/browse/` (see client requests)
 
 **Service Management:**
 
@@ -3100,14 +3246,29 @@ Received when a new notification is created for you.
 
 ### Booking Flow
 
-#### For Offered Services (Client books Accountant's service)
+#### For Offered Regular Services (Client books Accountant's service)
 
-1. **Accountant** creates offered service: `POST /services/create/` (service_type: "offered")
-2. **Client** browses offered services: `GET /services/browse/`
+1. **Accountant** creates offered service: `POST /services/create/` with `is_course: false` or omit field
+2. **Client** browses offered services: `GET /services/browse/` (sees services where `is_course: false`)
 3. **Client** books service: `POST /bookings/create/` with service details (status: "pending")
+   - Required fields: `service`, `full_name`
+   - Optional fields: `linkedin_url`, `cv_file`, `additional_notes`
 4. **Accountant** (service owner) accepts: `POST /bookings/{booking_id}/accept/` (status: "confirmed")
    - OR **Accountant** declines: `POST /bookings/{booking_id}/decline/` (status: "declined")
    - OR **Accountant** updates status: `PATCH /bookings/{booking_id}/update/` (status: "confirmed"/"declined")
+
+#### For Offered Courses (Academic books Accountant's course)
+
+1. **Accountant** creates course: `POST /services/create/` with **`is_course: true`** (required)
+2. **Academic** browses courses: `GET /services/browse/` (sees services where `is_course: true`)
+3. **Academic** books course: `POST /bookings/create/` with minimal details (status: "pending")
+   - Required fields: `service`, `full_name`
+   - Optional fields: `linkedin_url`, `cv_file`, `additional_notes`
+   - **Note**: CV and LinkedIn are optional for course bookings
+4. **Accountant** (course instructor) accepts: `POST /bookings/{booking_id}/accept/` (status: "confirmed")
+   - Academic receives notification that booking is confirmed
+   - Accountant manually adds academic to course chat group
+   - OR **Accountant** declines: `POST /bookings/{booking_id}/decline/` (status: "declined")
 
 #### For Needed Services (Accountant proposes to Client's request)
 
@@ -3120,12 +3281,19 @@ Received when a new notification is created for you.
 
 #### Booking Information Flow
 
-**During Booking Creation:**
+**During Booking Creation (Regular Services):**
 
-- **Full Name**: Contact person's name
-- **LinkedIn URL**: Optional professional profile link
-- **CV File**: Optional resume/CV upload (supports file uploads)
-- **Additional Notes**: Optional requirements, questions, or additional information
+- **Full Name** (required): Contact person's name
+- **LinkedIn URL** (optional): Professional profile link
+- **CV File** (optional): Resume/CV upload (supports file uploads)
+- **Additional Notes** (optional): Requirements, questions, or additional information
+
+**During Booking Creation (Courses):**
+
+- **Full Name** (required): Academic's name
+- **LinkedIn URL** (optional): Professional profile link
+- **CV File** (optional): Not typically required for courses
+- **Additional Notes** (optional): Questions about the course, availability, learning goals
 
 **Status Flow:**
 
@@ -3135,11 +3303,16 @@ Received when a new notification is created for you.
 
 **Permissions:**
 
-- Only the **service owner** can accept/decline bookings
-- Both **client** and **accountant** can view booking details if they are participants
-- Both participants can update booking information (name, LinkedIn, CV, notes)
+- Only the **service owner** (accountant/course instructor) can accept/decline bookings
+- **Clients** and **academics** can view their own booking details
+- **Accountants** can view bookings for their services/courses
+- All participants can update booking information (name, LinkedIn, CV, notes)
 
-**Note**: Academic users cannot participate in the booking system as they don't have access to the service marketplace.
+**Chat Room Integration (Courses Only):**
+
+- After accepting a course booking, the accountant **manually** adds the academic to the course chat group
+- Academics receive a notification informing them they'll be added to the course chat
+- Chat room management is done through the chat system (not automated)
 
 ---
 
@@ -3162,9 +3335,9 @@ Received when a new notification is created for you.
 
 ### User Types and Permissions
 
-- **client**: Can create "needed" services, book offered services, create client profile, search for accountants
-- **accountant**: Can create "offered" services, propose to needed services, create accountant profile, search for clients
-- **academic**: Can create academic profile, limited access to service marketplace
+- **client**: Can create "needed" services, book regular offered services (`is_course: false`), create client profile, search for accountants
+- **accountant**: Can create "offered" services (regular or courses by setting `is_course`), propose to needed services, create accountant profile, search for clients and academics, manage course bookings
+- **academic**: Can browse and book courses (`is_course: true`), create academic profile, cannot create services, can be added to course chat groups
 - **admin**: Full platform access and management capabilities
 
 ---
@@ -3196,9 +3369,14 @@ Received when a new notification is created for you.
 
 - Users can only manage their own services and bookings
 - Users can only view/update bookings they participate in
-- Time slot conflicts are automatically prevented for confirmed bookings
-- Service types are automatically assigned based on user type (clients create "needed", accountants create "offered")
-- Academic users are restricted from service marketplace access
+- Service types are automatically assigned based on user type:
+  - Clients create "needed" services
+  - Accountants create "offered" services (regular or courses)
+  - Academics cannot create services
+- **Course Creation**: Accountants must explicitly set `is_course: true` to create a course
+- **Course Access**: Only academics can browse and book courses 
+- **Service Access**: Only clients can browse and book regular services 
+
 - Role-based filtering ensures users only see relevant services
 
 ---

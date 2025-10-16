@@ -81,7 +81,10 @@ class BookingListAPIView(generics.ListAPIView):
             return qs.filter(accountant=user)
         if user_type.lower() == "client":
             return qs.filter(client=user)
-        return qs
+        
+        elif user_type.lower() == "academic":
+            return qs.filter(client=user, service__is_course=True)
+        return qs.none()
 
 
 class BookingDetailAPIView(generics.RetrieveAPIView):

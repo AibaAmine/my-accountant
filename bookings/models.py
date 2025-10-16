@@ -8,7 +8,7 @@ class Booking(models.Model):
 
     booking_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     client = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="client_bookings"
+        User, on_delete=models.CASCADE, related_name="service_requester_bookings"
     )
     accountant = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="accountant_bookings"

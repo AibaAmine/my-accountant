@@ -152,6 +152,38 @@ class ClientServiceDetailSerializer(serializers.ModelSerializer):
         return ServiceAttachmentSerializer(
             attachments, many=True, context=self.context
         ).data
+        
+
+
+class CourseDetailSerializer(serializers.ModelSerializer):
+    
+    user = CustomUserDetailsSerializer(read_only=True)
+    categories = ServiceCategorySerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Service
+        fields = [
+            "id",
+            "user",
+            "service_type",
+            "title",
+            "description",
+            "categories",
+            "estimated_duration",
+            "duration_unit",
+            "estimated_duration_description",
+            "price",
+            "price_description",
+            "location",
+            "location_description",
+            "delivery_method",
+            "is_active",
+            "is_featured",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ("id", "user", "created_at", "updated_at", "service_type")
+    
 
 
 class ServiceCreateSerializer(serializers.ModelSerializer):
@@ -184,6 +216,7 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             "delivery_method",
             "upload_files",
             "created_at",
+            "is_course",
         ]
         read_only_fields = ("id", "created_at", "user", "service_type", "updated_at")
 
@@ -209,6 +242,9 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             data["service_type"] = "needed"
         elif user.user_type.lower() == "accountant":
             data["service_type"] = "offered"
+            
+            if "is_course" not in data:
+               data["is_course"] = False
         else:
             raise serializers.ValidationError("Invalid user type.")
 
@@ -292,8 +328,10 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
             "location_description",
             "delivery_method",
             "upload_files",
+            "is_course"
+
         ]
-        read_only_fields = ("id", "user", "service_type", "created_at", "updated_at")
+        read_only_fields = ("id", "user", "service_type", "created_at", "updated_at","is_course")
 
     def validate_categories(self, value):
         """Validate that all provided category IDs exist and are active"""
@@ -376,3 +414,6 @@ class ServiceUpdateSerializer(serializers.ModelSerializer):
         ).data
 
         return representation
+
+
+

@@ -64,6 +64,7 @@ class Service(models.Model):
     SERVICE_TYPE_CHOICES = [
         ("needed", "Service Needed"),  # Client posting what they need
         ("offered", "Service Offered"),  # Accountant posting what they provide
+    
     ]
 
     DURATION_CHOICES = [
@@ -143,6 +144,10 @@ class Service(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="services")
     service_type = models.CharField(max_length=20, choices=SERVICE_TYPE_CHOICES)
+    
+    is_course = models.BooleanField(default=False)
+    
+    
 
     # Core content
     title = models.CharField(max_length=255)

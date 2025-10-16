@@ -19,7 +19,7 @@ class BookingDetailSerializer(serializers.ModelSerializer):
             "booking_id",
             "created_at",
             "updated_at",
-            "client",
+            "service_requester",
             "accountant",
             "service",
         ]
@@ -30,7 +30,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = [
-            "booking_id", 
+            "booking_id",
             "service",
             "full_name",
             "linkedin_url",
@@ -48,14 +48,16 @@ class BookingCreateSerializer(serializers.ModelSerializer):
 
         req_role = (getattr(request.user, "user_type", "") or "").lower()
 
-        if service.service_type == "offered":
-            # Client booking accountant's offered service
-            if req_role != "client":
+        if service.service_type == "offered" and service.is_course:
+            if req_role != "academic":
+                raise serializers.ValidationError("Only academics can book courses.")
+
+        elif service.service_type == "offered" and not service.is_course:
+            if req_role != "client" :
                 raise serializers.ValidationError(
-                    "Only a client can book an offered service."
+                    "Only a client  can book an offered service."
                 )
         elif service.service_type == "needed":
-            # Accountant proposing to client's needed service
             if req_role != "accountant":
                 raise serializers.ValidationError(
                     "Only an accountant can propose to a needed service."
@@ -73,16 +75,20 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         service = validated_data["service"]
         request = self.context["request"]
 
-        # Decide parties from service.service_type
-        if service.service_type == "offered":
-            client = request.user
+        if service.service_type == "offered" and service.is_course == True:
+            service_requester = request.user
             accountant = service.user
-        else:  # "needed"
-            client = service.user
+
+        # Decide parties from service.service_type
+        elif service.service_type == "offered" and service.is_course == False:
+            service_requester = request.user
+            accountant = service.user
+        else:  # "needed" booker is client
+            service_requester = service.user
             accountant = request.user
 
         booking = Booking.objects.create(
-            client=client,
+            client=service_requester,
             accountant=accountant,
             status="pending",
             **validated_data,
