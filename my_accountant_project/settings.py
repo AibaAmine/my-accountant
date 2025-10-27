@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_filters",
     "drf_yasg",
+        'anymail', 
     "accounts.apps.AccountsConfig",
     "profiles",
     "services",
@@ -224,19 +225,20 @@ if DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 else:
     # Production - use SMTP
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
 
-    # Gmail SMTP Configuration
-    EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-    EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
-    EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False").lower() == "true"
-    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
-    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+
+    
+#brevo api key
+
+ANYMAIL = {
+    "BREVO_API_KEY": os.getenv("BREVO_API_KEY"),
+}
 
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@myaccountant.com")
 SERVER_EMAIL = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 EMAIL_TIMEOUT = 30  # Email timeout in seconds
+
 EMAIL_BACKEND_FAILSILENTLY = (
     os.getenv("EMAIL_BACKEND_FAILSILENTLY", "False").lower() == "true"
 )
