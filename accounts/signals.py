@@ -20,19 +20,28 @@ def create_user_profile(sender, instance, created, **kwargs):
             )
 
             if instance.user_type == "accountant":
-                profile = AccountantProfile.objects.create(user=instance)
+                profile = AccountantProfile.objects.create(
+                    user=instance,
+                    phone=instance.phone  
+                )
                 print(
                     f"[DEBUG] Created AccountantProfile for {instance.email} - ID: {profile.profile_id}"
                 )
 
             elif instance.user_type == "client":
-                profile = ClientProfile.objects.create(user=instance)
+                profile = ClientProfile.objects.create(
+                    user=instance,
+                    phone=instance.phone  
+                )
                 print(
                     f"[DEBUG] Created ClientProfile for {instance.email} - ID: {profile.profile_id}"
                 )
 
             elif instance.user_type == "academic":
-                profile = AcademicProfile.objects.create(user=instance)
+                profile = AcademicProfile.objects.create(
+                    user=instance,
+                    phone=instance.phone  
+                )
                 print(
                     f"[DEBUG] Created AcademicProfile for {instance.email} - ID: {profile.profile_id}"
                 )

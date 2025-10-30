@@ -1,20 +1,15 @@
 from django.urls import path
 from .views import (
-    AccountantProfileAPIView,
-    ClientProfileAPIView,
-    AcademicProfileAPIView,
+    MyProfileAPIView,
     ProfileInfosApiView,
 )
 
 app_name = "profiles"
 
 urlpatterns = [
-    # Accountant Profile URLs
-    path("accountant/", AccountantProfileAPIView.as_view(), name="accountant-profile"),
-    # Client Profile URLs
-    path("client/", ClientProfileAPIView.as_view(), name="client-profile"),
-    # Academic Profile URLs
-    path("academic/", AcademicProfileAPIView.as_view(), name="academic-profile"),
-    # Profile Info by user ID
+    # Unified Profile endpoint for all user types (GET & PATCH/PUT)
+    path("me/", MyProfileAPIView.as_view(), name="my-profile"),
+    
+    # Profile Info by user ID (for viewing other users' profiles)
     path("info/<uuid:user_id>/", ProfileInfosApiView.as_view(), name="profile-info"),
 ]

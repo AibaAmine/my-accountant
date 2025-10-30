@@ -15,136 +15,45 @@ from rest_framework.views import APIView
 from accounts.models import User
 
 
-# Accountant Profile Views
-class AccountantProfileAPIView(generics.RetrieveUpdateAPIView):
-    serializer_class = AccountantProfileSerializer
+class MyProfileAPIView(generics.RetrieveUpdateAPIView):
+  
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
-    queryset = AccountantProfile.objects.all()
 
-    def get_object(self):
+    def get_serializer_class(self):
         user = self.request.user
-        try:
-            return AccountantProfile.objects.get(user=user)
-        except AccountantProfile.DoesNotExist:
-            raise NotFound("Profile not found.")
-
-    def perform_update(self, serializer):
-        if serializer.instance.user != self.request.user:
-            raise PermissionDenied("You do not have permission to update this profile.")
-        serializer.save()
-
-    def update(self, request, *args, **kwargs):
-        """Custom update method to handle form-data with files"""
-        instance = self.get_object()
-
-        # Check if this is form-data request with files
-        if (
-            hasattr(request, "content_type")
-            and "multipart/form-data" in request.content_type
-        ):
-            # Handle form-data
-            data = {}
-            for key, value in request.data.items():
-                if key != "upload_files":
-                    data[key] = value
-
-            # Handle multiple file uploads
-            upload_files = request.FILES.getlist("upload_files")
-            if upload_files:
-                # Delete existing attachments
-                instance.profile_attachments.all().delete()
-
-                # Create new attachments
-                for file in upload_files:
-                    ProfileAttachment.objects.create(
-                        accountant_profile=instance,
-                        file=file,
-                        original_filename=file.name,
-                        file_size=file.size,
-                    )
+        if user.user_type == "accountant":
+            return AccountantProfileSerializer
+        elif user.user_type == "client":
+            return ClientProfileSerializer
+        elif user.user_type == "academic":
+            return AcademicProfileSerializer
         else:
-            # Handle JSON data normally
-            data = request.data
+            raise NotFound("Invalid user type.")
 
-        serializer = self.get_serializer(instance, data=data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-
-        return Response(serializer.data)
-
-
-# Client Profile Views
-class ClientProfileAPIView(generics.RetrieveUpdateAPIView):
-    serializer_class = ClientProfileSerializer
-    permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
-    queryset = ClientProfile.objects.all()
-
-    def get_object(self):
+    def get_queryset(self):
         user = self.request.user
-        try:
-            return ClientProfile.objects.get(user=user)
-        except ClientProfile.DoesNotExist:
-            raise NotFound("Profile not found.")
-
-    def perform_update(self, serializer):
-        if serializer.instance.user != self.request.user:
-            raise PermissionDenied("You do not have permission to update this profile.")
-        serializer.save()
-
-    def update(self, request, *args, **kwargs):
-        """Custom update method to handle form-data with files"""
-        instance = self.get_object()
-
-        # Check if this is form-data request with files
-        if (
-            hasattr(request, "content_type")
-            and "multipart/form-data" in request.content_type
-        ):
-            # Handle form-data
-            data = {}
-            for key, value in request.data.items():
-                if key != "upload_files":
-                    data[key] = value
-
-            # Handle multiple file uploads
-            upload_files = request.FILES.getlist("upload_files")
-            if upload_files:
-                # Delete existing attachments
-                instance.profile_attachments.all().delete()
-
-                # Create new attachments
-                for file in upload_files:
-                    ProfileAttachment.objects.create(
-                        client_profile=instance,
-                        file=file,
-                        original_filename=file.name,
-                        file_size=file.size,
-                    )
+        if user.user_type == "accountant":
+            return AccountantProfile.objects.all()
+        elif user.user_type == "client":
+            return ClientProfile.objects.all()
+        elif user.user_type == "academic":
+            return AcademicProfile.objects.all()
         else:
-            # Handle JSON data normally
-            data = request.data
-
-        serializer = self.get_serializer(instance, data=data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-
-        return Response(serializer.data)
-
-
-# Academic Profile Views
-class AcademicProfileAPIView(generics.RetrieveUpdateAPIView):
-    serializer_class = AcademicProfileSerializer
-    permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
-    queryset = AcademicProfile.objects.all()
+            return AccountantProfile.objects.none()
 
     def get_object(self):
         user = self.request.user
         try:
-            return AcademicProfile.objects.get(user=user)
-        except AcademicProfile.DoesNotExist:
+            if user.user_type == "accountant":
+                return AccountantProfile.objects.get(user=user)
+            elif user.user_type == "client":
+                return ClientProfile.objects.get(user=user)
+            elif user.user_type == "academic":
+                return AcademicProfile.objects.get(user=user)
+            else:
+                raise NotFound("Profile not found for this user type.")
+        except (AccountantProfile.DoesNotExist, ClientProfile.DoesNotExist, AcademicProfile.DoesNotExist):
             raise NotFound("Profile not found.")
 
     def perform_update(self, serializer):
@@ -173,14 +82,23 @@ class AcademicProfileAPIView(generics.RetrieveUpdateAPIView):
                 # Delete existing attachments
                 instance.profile_attachments.all().delete()
 
-                # Create new attachments
+                # Create new attachments for the appropriate profile type
                 for file in upload_files:
-                    ProfileAttachment.objects.create(
-                        academic_profile=instance,
-                        file=file,
-                        original_filename=file.name,
-                        file_size=file.size,
-                    )
+                    attachment_data = {
+                        "file": file,
+                        "original_filename": file.name,
+                        "file_size": file.size,
+                    }
+                    
+                    # Set the appropriate foreign key based on user type
+                    if request.user.user_type == "accountant":
+                        attachment_data["accountant_profile"] = instance
+                    elif request.user.user_type == "client":
+                        attachment_data["client_profile"] = instance
+                    elif request.user.user_type == "academic":
+                        attachment_data["academic_profile"] = instance
+                    
+                    ProfileAttachment.objects.create(**attachment_data)
         else:
             # Handle JSON data normally
             data = request.data

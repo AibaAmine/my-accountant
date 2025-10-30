@@ -417,94 +417,157 @@ https://my-accountant-j02f.onrender.com
 
 ### 8. Profile Management
 
-The platform supports role-based profile management for different user types. Each user type has its own profile structure and endpoints. Profiles are **automatically created** when a user registers using Django signals, so there's no need for explicit profile creation endpoints.
+The platform supports role-based profile management for different user types. Each user type has its own profile structure. Profiles are **automatically created** when a user registers using Django signals, so there's no need for explicit profile creation endpoints.
 
-#### Update/Retrieve Accountant Profile 🔒
+#### Get/Update My Profile 🔒
 
-**Endpoint:** `GET/PUT/PATCH /profiles/accountant/`
+**Endpoint:** `GET/PUT/PATCH /profiles/me/`
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Description:** Retrieve or update the authenticated user's accountant profile. Only users with `user_type: "accountant"` can access this endpoint. The profile is automatically created when the user registers.
+**Description:** Unified endpoint to retrieve or update the authenticated user's profile. The endpoint automatically detects the user type (accountant, client, or academic) and returns the appropriate profile. The profile is automatically created when the user registers.
 
-**Request Body (PUT/PATCH):**
+**Request Body (PUT/PATCH) - Accountant:**
 
-For regular profile updates (JSON):
+Available fields to update:
+
+- `profile_picture` - Profile image file
+- `phone` - Phone number (e.g., "+213796269301")
+- `location` - Location/city (e.g., "Alger")
+- `bio` - Biography/description text
+- `upload_files` - Array of files (certifications, documents)
+
+Example JSON request:
 
 ```json
 {
-  "profile_picture": "image_file",
-  "phone": "+1234567890",
-  "location": "Algiers, Algeria",
-  "bio": "Experienced CPA with 10+ years in tax preparation and financial consulting...",
-  "working_hours": {
-    "monday": { "start": "09:00", "end": "17:00" },
-    "tuesday": { "start": "09:00", "end": "17:00" },
-    "wednesday": { "start": "09:00", "end": "17:00" },
-    "thursday": { "start": "09:00", "end": "17:00" },
-    "friday": { "start": "09:00", "end": "17:00" },
-    "saturday": "closed",
-    "sunday": "closed"
-  },
-  "is_available": true
+  "phone": "+213796269301",
+  "location": "Alger",
+  "bio": "أنا محمم وأجهة مستخدم تجربة مستخدم مبدع ومقيم في الجزائر"
 }
 ```
 
-For multiple file uploads (form-data):
+Example form-data request with files:
 
 ```
 Content-Type: multipart/form-data
 
-phone: "+1234567890"
-location: "Algiers, Algeria"
-bio: "Experienced CPA with 10+ years in tax preparation..."
-working_hours: {"monday": {"start": "09:00", "end": "17:00"}, ...}
-is_available: true
-upload_files: [file1.pdf, file2.pdf, file3.pdf]  // Multiple files
-profile_picture: profile_image.jpg
+phone: "+213796269301"
+location: "Alger"
+bio: "أنا محمم وأجهة مستخدم تجربة مستخدم مبدع ومقيم في الجزائر"
+profile_picture: image.jpg
+upload_files: file1.pdf
+upload_files: file2.pdf
 ```
 
-**Response (Success - 200):**
+---
+
+**Request Body (PUT/PATCH) - Client (Economic Operator):**
+
+Available fields to update:
+
+- `profile_picture` - Profile image file
+- `phone` - Phone number (e.g., "+213796269301")
+- `location` - Location/city (e.g., "Alger")
+- `activity_type` - Type of business/activity (e.g., "عمل اقتصادي")
+- `upload_files` - Array of files (business documents, registrations)
+
+Example JSON request:
+
+```json
+{
+  "phone": "+213796269301",
+  "location": "Alger",
+  "activity_type": "عمل اقتصادي"
+}
+```
+
+Example form-data request with files:
+
+```
+Content-Type: multipart/form-data
+
+phone: "+213796269301"
+location: "Alger"
+activity_type: "عمل اقتصادي"
+profile_picture: image.jpg
+upload_files: file1.pdf
+upload_files: file2.pdf
+```
+
+> **Note:** To upload multiple files, send the `upload_files` field multiple times (once per file), not as an array.
+
+---
+
+**Request Body (PUT/PATCH) - Academic:**
+
+Available fields to update:
+
+- `profile_picture` - Profile image file
+- `phone` - Phone number (e.g., "+213796269301")
+- `location` - Location/city (e.g., "Alger")
+- `bio` - Biography/description text
+- `upload_files` - Array of files (academic credentials, certificates)
+
+Example JSON request:
+
+```json
+{
+  "phone": "+213796269301",
+  "location": "Alger",
+  "bio": "أنا محمم وأجهة مستخدم تجربة مستخدم مبدع ومقيم في الجزائر"
+}
+```
+
+Example form-data request with files:
+
+```
+Content-Type: multipart/form-data
+
+phone: "+213796269301"
+location: "Alger"
+bio: "أنا محمم وأجهة مستخدم تجربة مستخدم مبدع ومقيم في الجزائر"
+profile_picture: image.jpg
+upload_files: file1.pdf
+upload_files: file2.pdf
+```
+
+> **Note:** To upload multiple files, send the `upload_files` field multiple times (once per file), not as an array.
+
+---
+
+**Response (Success - 200) - Accountant Example:**
 
 ```json
 {
   "profile_id": "uuid-here",
   "user": {
     "pk": "uuid-here",
-    "email": "accountant@example.com",
-    "full_name": "Jane Smith",
+    "email": "abdou8@gmail.com",
+    "full_name": "عبد الرحمن القيّم",
     "user_type": "accountant",
-    "phone": "+1234567890",
+    "phone": "+213796269301",
     "is_email_verified": true,
     "account_status": "active",
     "created_at": "2025-01-01T12:00:00Z",
     "updated_at": "2025-01-01T12:00:00Z"
   },
-  "profile_picture": "https://example.com/profile.jpg",
-  "phone": "+1234567890",
-  "location": "Algiers, Algeria",
-  "bio": "Experienced CPA with 10+ years...",
-  "working_hours": {
-    "monday": { "start": "09:00", "end": "17:00" },
-    "tuesday": { "start": "09:00", "end": "17:00" },
-    "wednesday": { "start": "09:00", "end": "17:00" },
-    "thursday": { "start": "09:00", "end": "17:00" },
-    "friday": { "start": "09:00", "end": "17:00" },
-    "saturday": "closed",
-    "sunday": "closed"
-  },
+  "profile_picture": "https://example.com/media/profile_pictures/accountants/image.jpg",
+  "phone": "+213796269301",
+  "location": "Alger",
+  "bio": "أنا محمم وأجهة مستخدم تجربة مستخدم مبدع ومقيم في الجزائر",
   "all_attachments": [
     {
-      "id": "uuid-here",
-      "url": "/media/profile_attachments/certification.pdf",
-      "filename": "شهادة الخبرة المحاسبية.pdf",
+      "attachment_id": "uuid-here",
+      "url": "https://example.com/media/profile_attachments/cert.pdf",
+      "filename": "شهادة خبرة مكتب محاسبي.pdf",
       "size": 245760,
       "uploaded_at": "2025-01-01T12:00:00Z"
     },
     {
-      "id": "uuid-here",
-      "url": "/media/profile_attachments/license.pdf",
-      "filename": "ترخيص مزاولة المهنة.pdf",
+      "attachment_id": "uuid-here",
+      "url": "https://example.com/media/profile_attachments/license.pdf",
+      "filename": "نسخة من رخصتي كمكتب محاسبي معتمد.pdf",
       "size": 134567,
       "uploaded_at": "2025-01-01T12:00:00Z"
     }
@@ -514,171 +577,103 @@ profile_picture: profile_image.jpg
     {
       "id": "uuid-here",
       "service_type": "offered",
-      "title": "Tax Declaration Preparation",
-      "description": "Professional tax filing services...",
-      "categories": [...],
-      "price": "8000.00",
-      "location": "16",
-      "delivery_method": "online",
-      "is_featured": false,
+      "title": "الضمانة",
+      "description": "اسم الشركة او الصيل المتوقع...",
+      "price": "14.02",
       "created_at": "2025-01-01T12:00:00Z"
     }
   ],
-  "is_available": true,
   "created_at": "2025-01-01T12:00:00Z",
   "updated_at": "2025-01-01T12:00:00Z"
 }
 ```
 
-#### Retrieve/Update Client Profile 🔒
+---
 
-**Endpoint:** `GET/PUT/PATCH /profiles/client/`
-
-**Headers:** `Authorization: Bearer <access_token>`
-
-**Description:** Retrieve or update the authenticated user's client profile. Only users with `user_type: "client"` can access this endpoint. The profile is automatically created when the user registers.
-
-**Request Body (PUT/PATCH):**
-
-For regular profile updates (JSON):
-
-```json
-{
-  "profile_picture": "image_file",
-  "phone": "+1234567890",
-  "location": "Oran, Algeria",
-  "activity_type": "Food Distribution Company"
-}
-```
-
-For multiple file uploads (form-data):
-
-```
-Content-Type: multipart/form-data
-
-phone: "+1234567890"
-location: "Oran, Algeria"
-activity_type: "Food Distribution Company"
-upload_files: [file1.pdf, file2.pdf]  // Multiple files
-profile_picture: profile_image.jpg
-```
-
-**Response (Success - 200):**
+**Response (Success - 200) - Client (Economic Operator) Example:**
 
 ```json
 {
   "profile_id": "uuid-here",
   "user": {
     "pk": "uuid-here",
-    "email": "client@example.com",
-    "full_name": "Company Name",
+    "email": "algerietelecom@gmail.com",
+    "full_name": "اتصالات الجزائر",
     "user_type": "client",
-    "phone": "+1234567890",
+    "phone": "+213796269301",
     "is_email_verified": true,
     "account_status": "active",
     "created_at": "2025-01-01T12:00:00Z",
     "updated_at": "2025-01-01T12:00:00Z"
   },
-  "profile_picture": "https://example.com/profile.jpg",
-  "phone": "+1234567890",
-  "location": "Oran, Algeria",
-  "activity_type": "Food Distribution Company",
+  "profile_picture": "https://example.com/media/profile_pictures/clients/image.jpg",
+  "phone": "+213796269301",
+  "location": "Alger",
+  "activity_type": "عمل اقتصادي",
   "all_attachments": [
     {
-      "id": "uuid-here",
-      "url": "/media/profile_attachments/company_registration.pdf",
-      "filename": "شهادة التسجيل التجاري.pdf",
+      "attachment_id": "uuid-here",
+      "url": "https://example.com/media/profile_attachments/doc.pdf",
+      "filename": "شهادة تجارية بالعربي.pdf",
       "size": 512000,
-      "uploaded_at": "2025-01-01T12:00:00Z"
-    }
-  ],
-  "attachments_count": 1,
-  "all_services": [
-    {
-      "id": "uuid-here",
-      "service_type": "needed",
-      "title": "Need Tax Declaration Help",
-      "description": "Looking for professional accountant...",
-      "categories": [...],
-      "price": "5000.00",
-      "location": "31",
-      "delivery_method": "online",
-      "is_featured": false,
-      "created_at": "2025-01-01T12:00:00Z"
-    }
-  ],
-  "created_at": "2025-01-01T12:00:00Z",
-  "updated_at": "2025-01-01T12:00:00Z"
-}
-```
-
-#### Retrieve/Update Academic Profile 🔒
-
-**Endpoint:** `GET/PUT/PATCH /profiles/academic/`
-
-**Headers:** `Authorization: Bearer <access_token>`
-
-**Description:** Retrieve or update the authenticated user's academic profile. Only users with `user_type: "academic"` can access this endpoint. The profile is automatically created when the user registers.
-
-**Request Body (PUT/PATCH):**
-
-For regular profile updates (JSON):
-
-```json
-{
-  "profile_picture": "image_file",
-  "phone": "+1234567890",
-  "bio": "Professor of Accounting at University..."
-}
-```
-
-For multiple file uploads (form-data):
-
-```
-Content-Type: multipart/form-data
-
-phone: "+1234567890"
-bio: "Professor of Accounting at University..."
-upload_files: [file1.pdf, file2.pdf]  // Multiple files
-profile_picture: profile_image.jpg
-```
-
-**Response (Success - 200):**
-
-```json
-{
-  "profile_id": "uuid-here",
-  "user": {
-    "pk": "uuid-here",
-    "email": "academic@example.com",
-    "full_name": "Dr. Academic Name",
-    "user_type": "academic",
-    "phone": "+1234567890",
-    "is_email_verified": true,
-    "account_status": "active",
-    "created_at": "2025-01-01T12:00:00Z",
-    "updated_at": "2025-01-01T12:00:00Z"
-  },
-  "profile_picture": "https://example.com/profile.jpg",
-  "phone": "+1234567890",
-  "bio": "Professor of Accounting at University...",
-  "all_attachments": [
-    {
-      "id": "uuid-here",
-      "url": "/media/profile_attachments/phd_certificate.pdf",
-      "filename": "شهادة الدكتوراه في المحاسبة.pdf",
-      "size": 345678,
       "uploaded_at": "2025-01-01T12:00:00Z"
     },
     {
-      "id": "uuid-here",
-      "url": "/media/profile_attachments/research_papers.pdf",
-      "filename": "الأوراق البحثية المنشورة.pdf",
-      "size": 1024000,
+      "attachment_id": "uuid-here",
+      "url": "https://example.com/media/profile_attachments/doc2.pdf",
+      "filename": "نسخة من رخصتني كعمتب محاسبي معتمد.pdf",
+      "size": 245000,
       "uploaded_at": "2025-01-01T12:00:00Z"
     }
   ],
   "attachments_count": 2,
+  "all_services": [
+    {
+      "id": "uuid-here",
+      "service_type": "needed",
+      "title": "الخدمة",
+      "description": "اسم الشركة او الصيل المتوقع...",
+      "price": "14.02",
+      "created_at": "2025-01-01T12:00:00Z"
+    }
+  ],
+  "created_at": "2025-01-01T12:00:00Z",
+  "updated_at": "2025-01-01T12:00:00Z"
+}
+```
+
+---
+
+**Response (Success - 200) - Academic Example:**
+
+```json
+{
+  "profile_id": "uuid-here",
+  "user": {
+    "pk": "uuid-here",
+    "email": "algerietelecom@gmail.com",
+    "full_name": "الاسم الكامل",
+    "user_type": "academic",
+    "phone": "+213796269301",
+    "is_email_verified": true,
+    "account_status": "active",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
+  },
+  "profile_picture": "https://example.com/media/profile_pictures/academics/image.jpg",
+  "phone": "+213796269301",
+  "location": "Alger",
+  "bio": "أنا محمم وأجهة مستخدم تجربة مستخدم مبدع ومقيم في الجزائر",
+  "all_attachments": [
+    {
+      "attachment_id": "uuid-here",
+      "url": "https://example.com/media/profile_attachments/cert.pdf",
+      "filename": "الدورة",
+      "size": 345678,
+      "uploaded_at": "2025-01-01T12:00:00Z"
+    }
+  ],
+  "attachments_count": 1,
   "created_at": "2025-01-01T12:00:00Z",
   "updated_at": "2025-01-01T12:00:00Z"
 }
@@ -686,9 +681,10 @@ profile_picture: profile_image.jpg
 
 **Key Features:**
 
+- **Unified Endpoint**: One endpoint (`/profiles/me/`) for all user types - no need to know the user type in advance
+- **Automatic Detection**: The API automatically detects the user type and returns the appropriate profile
 - **Automatic Profile Creation**: Profiles are created automatically via Django signals when users register
-- **Role-Based Access**: Each user type can only access their corresponding profile endpoint
-- **Service Integration**: Accountant and Client profiles include an `all_services` field showing all active services created by the user
+- **Service Integration**: Accountant and Client profiles include an `all_services` field showing all active services created by the user (Academic profiles do not have services)
 - **Multiple File Attachments**: Profiles support multiple file uploads using the `upload_files` field with form-data
 - **File Downloads**: All attachment files are directly downloadable via their URL paths
 - **File Metadata**: Each attachment includes filename, size, upload timestamp, and unique ID
@@ -811,12 +807,12 @@ Content-Type: multipart/form-data
   "estimated_duration_description": "8 weeks with weekly 2-hour sessions",
   "price": 15000,
   "price_description": "15000 DZD for the complete 8-week course",
-  "delivery_method": "online",
-  
+  "delivery_method": "online"
 }
 ```
 
 **Important Note for Accountants:**
+
 - **Regular Services**: Set `is_course: false` or omit the field (defaults to false)
 - **Courses**: **Must** set `is_course: true` to create a course for academics
 - Courses will only be visible to academic users, regular services only to clients
@@ -1292,8 +1288,8 @@ upload_files: [file1.pdf, file2.pdf]  // Replace all existing files with these n
 
 The booking system enables clients, academics, and accountants to create, manage, and interact with service bookings. The system supports three main booking flows based on service types and user roles:
 
-- **Offered Services (Regular)**: Clients book accountants' regular services 
-- **Offered Services (Courses)**: Academics book accountants' courses 
+- **Offered Services (Regular)**: Clients book accountants' regular services
+- **Offered Services (Courses)**: Academics book accountants' courses
 - **Needed Services**: Accountants propose to fulfill clients' needed services
 
 ### 1. Booking Creation
@@ -1334,7 +1330,7 @@ The booking system enables clients, academics, and accountants to create, manage
   "service": "uuid-of-course",
   "full_name": "Sarah Academic",
   "additional_notes": "I'm excited to learn accounting fundamentals. I have basic math knowledge and available for all sessions.",
-  "cv_file": "file_upload",
+  "cv_file": "file_upload"
 }
 ```
 
@@ -3204,15 +3200,15 @@ Received when a new notification is created for you.
 
 **Profile Updates:**
 
-- **Accountants**: Update via `PUT/PATCH /profiles/accountant/`
-- **Clients**: Update via `PUT/PATCH /profiles/client/`
-- **Academics**: Update via `PUT/PATCH /profiles/academic/`
+- **All user types**: Use unified endpoint `GET/PUT/PATCH /profiles/me/`
+- The endpoint automatically detects user type and returns/updates the appropriate profile
 
 **Profile Features:**
 
+- **Unified Endpoint**: One endpoint for all user types - no need to know user type in advance
 - **Service Integration**: Accountant and Client profiles include `all_services` field showing user's active services
 - **File Handling**: Profile pictures and attachments return full URLs
-- **Role-Based Access**: Users can only access their own profile type endpoint
+- **Automatic Detection**: API automatically determines profile type based on authenticated user
 
 ### Service Management Flow
 
@@ -3225,7 +3221,7 @@ Received when a new notification is created for you.
 **Role-Based Service Creation:**
 
 1. **Clients**: Create "needed" services (requesting help) → `POST /services/create/` with `is_course: false` or omit field
-2. **Accountants**: 
+2. **Accountants**:
    - Create "offered" regular services → `POST /services/create/` with `is_course: false` or omit field
    - Create "offered" courses → `POST /services/create/` with **`is_course: true`** (required)
 3. **Academic users**: Cannot create services, can only browse and book courses
@@ -3374,8 +3370,8 @@ Received when a new notification is created for you.
   - Accountants create "offered" services (regular or courses)
   - Academics cannot create services
 - **Course Creation**: Accountants must explicitly set `is_course: true` to create a course
-- **Course Access**: Only academics can browse and book courses 
-- **Service Access**: Only clients can browse and book regular services 
+- **Course Access**: Only academics can browse and book courses
+- **Service Access**: Only clients can browse and book regular services
 
 - Role-based filtering ensures users only see relevant services
 

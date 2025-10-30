@@ -72,8 +72,6 @@ class AccountantProfile(models.Model):
     phone = models.CharField(max_length=20, blank=True)
     location = models.CharField(max_length=255, blank=True)
     bio = models.TextField(blank=True)
-    working_hours = models.JSONField(default=dict)
-    is_available = models.BooleanField(default=True)
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -123,10 +121,12 @@ class AcademicProfile(models.Model):
         upload_to="profile_pictures/academics/", null=True, blank=True
     )
     phone = models.CharField(max_length=20, blank=True)
+    location = models.CharField(max_length=255, blank=True)
     bio = models.TextField(blank=True)
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "academic_profiles"
