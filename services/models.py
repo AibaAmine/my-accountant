@@ -78,6 +78,7 @@ class Service(models.Model):
         ("online", "Online"),
         ("in_person", "In Person"),
     ]
+    
 
     WILAYA_CHOICES = [
         ("01", "Adrar"),

@@ -435,7 +435,7 @@ Available fields to update:
 - `phone` - Phone number (e.g., "+213796269301")
 - `location` - Location/city (e.g., "Alger")
 - `bio` - Biography/description text
-- `upload_files` - Array of files (certifications, documents)
+- `upload_files` - Multiple files (certifications, documents) - send this field multiple times, once per file
 
 Example JSON request:
 
@@ -470,7 +470,7 @@ Available fields to update:
 - `phone` - Phone number (e.g., "+213796269301")
 - `location` - Location/city (e.g., "Alger")
 - `activity_type` - Type of business/activity (e.g., "عمل اقتصادي")
-- `upload_files` - Array of files (business documents, registrations)
+- `upload_files` - Multiple files (business documents, registrations) - send this field multiple times, once per file
 
 Example JSON request:
 
@@ -507,7 +507,7 @@ Available fields to update:
 - `phone` - Phone number (e.g., "+213796269301")
 - `location` - Location/city (e.g., "Alger")
 - `bio` - Biography/description text
-- `upload_files` - Array of files (academic credentials, certificates)
+- `upload_files` - Multiple files (academic credentials, certificates) - send this field multiple times, once per file
 
 Example JSON request:
 

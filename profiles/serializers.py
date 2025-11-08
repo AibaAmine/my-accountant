@@ -108,6 +108,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "phone",
             "location",
             "activity_type",
+            "bio",
             "all_attachments",
             "attachments_count",
             "upload_files",
