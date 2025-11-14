@@ -153,3 +153,30 @@ class BookingListSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
         ]
+
+
+class BookingReceivedListSerializer(serializers.ModelSerializer):
+    """Serializer for received bookings - includes requester information"""
+    service = ServiceDetailSerializer(read_only=True)
+    requester_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Booking
+        fields = [
+            "booking_id",
+            "service",
+            "requester_id",
+            "status",
+            "created_at",
+        ]
+    
+    def get_requester_id(self, obj):
+        """
+        Return the ID of the person who made the booking request.
+        - For 'offered' services: client is the requester
+        - For 'needed' services: accountant is the requester
+        """
+        if obj.service.service_type == "offered":
+            return str(obj.client.id)
+        else:  # "needed"
+            return str(obj.accountant.id)

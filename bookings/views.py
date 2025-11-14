@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from .serializers import (
     BookingListSerializer,
+    BookingReceivedListSerializer,
     BookingCreateSerializer,
     BookingDetailSerializer,
     BookingUpdateSerializer,
@@ -66,7 +67,7 @@ class UpdateBookingAPIView(generics.UpdateAPIView):
 
 class BookingReceivedListAPIView(generics.ListAPIView):
 
-    serializer_class = BookingListSerializer
+    serializer_class = BookingReceivedListSerializer
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
