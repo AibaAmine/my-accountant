@@ -143,20 +143,20 @@ class PublicServiceListAPIView(generics.ListAPIView):
                 is_active=True, 
                 service_type="offered",
                 is_course=False
-            ).exclude(user=user)
+            ).exclude(user=user).select_related("user").prefetch_related("categories")
 
         if role == "accountant":
             return Service.objects.filter(
                 is_active=True,
                 service_type="needed"
-            ).exclude(user=user)
+            ).exclude(user=user).select_related("user").prefetch_related("categories")
             
         if role =="academic":
             return Service.objects.filter(
                 is_active = True ,
                 service_type="offered",
                 is_course=True
-            ).exclude(user=user)
+            ).exclude(user=user).select_related("user").prefetch_related("categories")
             
         return Service.objects.none()
 
