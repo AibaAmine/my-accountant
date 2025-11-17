@@ -80,8 +80,8 @@ class DatabaseOperations:
             notification = Notification.objects.create(
                 user=user,
                 notification_type="message",
-                title=f"New message from {sender_name}",
-                message=f"{sender_name} in {room_name}: {preview}",
+                title=f"رسالة جديدة من {sender_name}",
+                message=f"{sender_name} في {room_name}: {preview}",
                 related_object_id=room_id,
             )
             return notification

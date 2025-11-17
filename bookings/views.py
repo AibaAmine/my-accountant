@@ -36,8 +36,8 @@ class CreateBookingAPIView(generics.CreateAPIView):
         notification=Notification.objects.create(
             user=booking.service.user,
             notification_type="booking_created",
-            title="New Booking Request",
-            message=f"{self.request.user.full_name} booked your {booking.service.title} service ",
+            title="طلب حجز جديد",
+            message=f"{self.request.user.full_name} حجز خدمة {booking.service.title} الخاصة بك",
             related_object_id=booking.booking_id,
         )
         
@@ -132,20 +132,20 @@ class AcceptBookingAPIView(views.APIView):
             ).get(booking_id=booking_id)
         except Booking.DoesNotExist:
             return Response(
-                {"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "لم يتم العثور على الحجز"}, status=status.HTTP_404_NOT_FOUND
             )
 
         # Check if user is the service owner (the one who can accept/decline)
         if request.user != booking.service.user:
             return Response(
-                {"error": "Only the service owner can accept this booking"},
+                {"error": "فقط صاحب الخدمة يمكنه قبول هذا الحجز"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         # Check if booking is in acceptable status
         if booking.status not in ["pending", "proposed"]:
             return Response(
-                {"error": f"Cannot accept booking with status: {booking.status}"},
+                {"error": f"لا يمكن قبول حجز بهذه الحالة: {booking.status}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -157,8 +157,8 @@ class AcceptBookingAPIView(views.APIView):
         notification = Notification.objects.create(
             user=booking.client,
             notification_type="booking_accepted",
-            title="Booking Confirmed",
-            message=f"Your booking for {booking.service.title} has been confirmed",
+            title="تم تأكيد الحجز",
+            message=f"تم تأكيد حجزك لخدمة {booking.service.title}",
             related_object_id=booking.booking_id,
         )
         send_notification_to_user(notification)
@@ -167,7 +167,7 @@ class AcceptBookingAPIView(views.APIView):
 
         return Response(
             {
-                "message": "Booking accepted successfully",
+                "message": "تم قبول الحجز بنجاح",
                 "booking_id": str(booking.booking_id),
                 "status": booking.status,
                 "client_id": str(booking.client.id),
@@ -191,19 +191,19 @@ class DeclineBookingAPIView(views.APIView):
             )
         except Booking.DoesNotExist:
             return Response(
-                {"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "لم يتم العثور على الحجز"}, status=status.HTTP_404_NOT_FOUND
             )
 
         # Check if user is the service owner (the one who can accept/decline)
         if request.user != booking.service.user:
             return Response(
-                {"error": "Only the service owner can decline this booking"},
+                {"error": "فقط صاحب الخدمة يمكنه رفض هذا الحجز"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         if booking.status not in ["pending", "proposed"]:
             return Response(
-                {"error": f"Cannot decline booking with status: {booking.status}"},
+                {"error": f"لا يمكن رفض حجز بهذه الحالة: {booking.status}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -213,15 +213,15 @@ class DeclineBookingAPIView(views.APIView):
         notification = Notification.objects.create(
             user=booking.client,
             notification_type="booking_declined",
-            title="Booking Declined",
-            message=f"Your booking for {booking.service.title} has been declined",
+            title="تم رفض الحجز",
+            message=f"تم رفض حجزك لخدمة {booking.service.title}",
             related_object_id=booking.booking_id,
         )
         send_notification_to_user(notification)
 
         return Response(
             {
-                "message": "Booking declined successfully",
+                "message": "تم رفض الحجز بنجاح",
                 "booking_id": str(booking.booking_id),
                 "status": booking.status,
             },
