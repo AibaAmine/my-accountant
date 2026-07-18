@@ -21,7 +21,6 @@ from notifications.models import Notification
 from notifications.utils import send_notification_to_user
 
 
-
 class CreateBookingAPIView(generics.CreateAPIView):
     serializer_class = BookingCreateSerializer
     permission_classes = [IsAuthenticated]
@@ -44,8 +43,6 @@ class CreateBookingAPIView(generics.CreateAPIView):
         send_notification_to_user(notification=notification)
         
         
-
-
 
 class UpdateBookingAPIView(generics.UpdateAPIView):
     serializer_class = BookingUpdateSerializer
